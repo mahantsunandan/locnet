@@ -201,26 +201,3 @@ func binaryAppendCRC(payload []byte) []byte {
 	sum := crc32.ChecksumIEEE(payload)
 	return append(payload, byte(sum>>24), byte(sum>>16), byte(sum>>8), byte(sum))
 }
-
-// TestTLSFlagRoundTrips, and stays invisible to a code without it: a code
-// minted before 0.10.4 has a zero flags byte and must parse as plain-HTTP.
-func TestTLSFlagRoundTrips(t *testing.T) {
-	for _, tls := range []bool{false, true} {
-		c := sample()
-		c.TLS = tls
-		s, err := c.Encode()
-		if err != nil {
-			t.Fatal(err)
-		}
-		got, err := Parse(s)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got.TLS != tls {
-			t.Errorf("TLS flag %v came back as %v", tls, got.TLS)
-		}
-		if !sameCode(got, c) {
-			t.Errorf("the flag disturbed the rest of the code: %+v", got)
-		}
-	}
-}

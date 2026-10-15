@@ -98,9 +98,6 @@ type NodeRow struct {
 	Groups []string `json:"groups,omitempty"`
 	Relay  string   `json:"relay_addr,omitempty"`
 	Admin  bool     `json:"admin,omitempty"`
-	// PlainHTTP is set while the machine's agent still talks to the hub
-	// without TLS, so the operator knows who to upgrade before -require-tls.
-	PlainHTTP bool `json:"plain_http,omitempty"`
 }
 
 // nodeRows builds the administrator's view of every machine.
@@ -118,8 +115,6 @@ func (s *Server) nodeRows() []NodeRow {
 			Online: time.Since(n.LastSeen) < onlineWindow,
 			Groups: pol.GroupsFor(n.Name),
 			Admin:  admins[n.Name],
-
-			PlainHTTP: s.usesPlain(n.ID),
 		}
 		if relayAddr, ok := s.relay.ObservedFor(n.ID); ok {
 			row.Relay = relayAddr.String()

@@ -349,15 +349,6 @@ sudo locnet-hub policy set policy.json
 sudo locnet-hub admins add office-laptop             # administer from that machine, not over SSH to the hub
 ```
 
-Once every machine runs 0.10.4 or later, refuse unencrypted connections to the
-hub. Machines that still need upgrading are listed at the end of
-`sudo locnet-hub nodes`:
-
-```bash
-echo 'LOCNET_HUB_FLAGS=-require-tls' | sudo tee -a /etc/locnet/hub.env
-sudo systemctl restart locnet-hub
-```
-
 [OPERATIONS.md](docs/OPERATIONS.md) covers policies, the access table, alerts,
 the audit log, a standby hub, waking machines, and publishing a web app to the
 internet. [SECURITY.md](docs/SECURITY.md) covers what is and is not protected.
@@ -366,7 +357,7 @@ internet. [SECURITY.md](docs/SECURITY.md) covers what is and is not protected.
 
 Build the new version and run the same installer again. Use `--hub` on the
 hub, and the elevated `install.ps1` on Windows. Each machine keeps its keys,
-address and membership. Machines and hub can be upgraded in any order.
+address and membership. Upgrade the hub first, then the other machines.
 
 ### Uninstalling
 
@@ -454,7 +445,7 @@ protocol it speaks.
 - Relay fallback, entered instantly and left as soon as a direct path forms
 - Signed network maps, with the hub's identity pinned by the join code
 - An encrypted control plane: TLS pinned to that same identity, with no
-  certificate authority and nothing to renew
+  certificate authority, nothing to renew, and no plain-HTTP fallback
 - Join codes with use limits and expiry, revocable from the hub
 - Stable addresses that survive reinstalling the agent
 - Linux, macOS and Windows, from one static binary per platform
@@ -467,7 +458,7 @@ protocol it speaks.
   default terminal with a shell on that machine; `locnet vnc` and `locnet rdp`
   open your own viewer. LocNet's job is to make the machine reachable and to
   know its address — not to reimplement a terminal emulator or a remote-desktop
-  client in a web page, which is what it used to do and what it no longer does
+  client in a web page
 - A web console for the whole network: every machine with its load, memory
   and disk, one-click connect, a two-pane file manager, commands across many
   machines, the job queue, this machine's shares and compute, a connection

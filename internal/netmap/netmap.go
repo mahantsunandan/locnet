@@ -2,11 +2,10 @@
 // this network, and how do I reach them".
 //
 // The map is signed by the hub's identity key and verified by every node
-// against the fingerprint baked into its join code. That signature is what
-// made the control channel safe to run over plain HTTP before it was
-// encrypted, and still protects agents that predate the encryption: an
-// attacker who can read or rewrite the wire still cannot add a peer, move a
-// peer's address, or hand a node a WireGuard key it will trust.
+// against the fingerprint baked into its join code. The map travels inside
+// TLS pinned to the same key, but the signature does not depend on that: an
+// attacker who could read or rewrite the wire still could not add a peer,
+// move a peer's address, or hand a node a WireGuard key it will trust.
 package netmap
 
 import (
@@ -140,13 +139,6 @@ type Network struct {
 	// pasted its join code, which is exactly when a backup hub is least
 	// likely to have existed yet.
 	Hubs []string `json:"hubs,omitempty"`
-
-	// HubTLS says the hub serves its control plane over TLS pinned to its
-	// identity key. A node that reads it — in a map it has verified, so
-	// nobody on the path can strip it — never talks plain HTTP to a bare
-	// hub address again. It is what turns an agent's first, opportunistic
-	// TLS connection into a requirement an active attacker cannot undo.
-	HubTLS bool `json:"hub_tls,omitempty"`
 }
 
 // NetMap is one node's view of the network. Version increases every time the

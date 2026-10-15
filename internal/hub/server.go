@@ -50,15 +50,6 @@ type Server struct {
 	logf           func(string, ...any)
 
 	replay replayGuard
-
-	// requireTLS refuses plain HTTP from anywhere but this machine. See
-	// SetRequireTLS.
-	requireTLS bool
-	// plainMu guards plainNodes: machines whose last signed request came
-	// over plain HTTP — agents from before 0.10.4 — so the operator can see
-	// who still has to be upgraded before plain HTTP is switched off.
-	plainMu    sync.Mutex
-	plainNodes map[string]bool
 }
 
 // NewServer builds the HTTP server. advertiseAddr is what goes into join
@@ -75,25 +66,16 @@ func NewServer(store *Store, relay *Relay, advertiseAddrs []string, logf func(st
 	return &Server{store: store, relay: relay, advertiseAddrs: advertiseAddrs, logf: logf}
 }
 
-// TLSListener wraps the API's TCP listener so that it serves TLS, pinned to
-// the hub's identity key, alongside plain HTTP on the same port; see package
-// hubtls. From then on every join code and netmap tells machines to use TLS,
-// and agents that understand that never fall back.
+// TLSListener wraps the API's TCP listener so that it serves TLS pinned to
+// the hub's identity key; see package hubtls. Plain HTTP on the same port is
+// answered only from this machine (see transportGate).
 func (s *Server) TLSListener(ln net.Listener) (net.Listener, error) {
 	cfg, err := hubtls.ServerConfig(s.store.HubKey())
 	if err != nil {
 		return nil, err
 	}
-	s.store.SetHubTLS(true)
 	return hubtls.Listen(ln, cfg), nil
 }
-
-// SetRequireTLS refuses plain HTTP from other machines: the end of the
-// transition, once every agent is 0.10.4 or later. Requests from this
-// machine's loopback address are still served — they never cross a network,
-// and the hub's own admin commands use them — and so is /healthz, which
-// carries nothing.
-func (s *Server) SetRequireTLS(on bool) { s.requireTLS = on }
 
 // SetStandbyAddrs publishes spare hubs to every node.
 //
@@ -160,75 +142,32 @@ func (s *Server) Handler() http.Handler {
 	return s.transportGate(mux)
 }
 
-// transportGate decides what plain HTTP may still do.
+// transportGate refuses plain HTTP from other machines.
 //
-// Agents older than 0.10.4 know nothing else, so by default plain HTTP is
-// served as it always was, with one exception: the snapshot, which is the
-// hub's signing key, is never handed out in the clear to another machine. A
-// standby from before 0.10.4 keeps its last copy until it is upgraded too.
+// The control plane carries join codes, every machine's endpoints, queue jobs
+// and their output, and — for a standby — the hub's signing key, so it crosses
+// a network only inside TLS. Plain HTTP is still answered from this machine
+// itself, which never leaves it and is what the hub's own admin commands use,
+// and on /healthz, which carries nothing.
 func (s *Server) transportGate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.TLS != nil || r.URL.Path == "/healthz" || isLoopback(r.RemoteAddr) {
+		if r.TLS != nil || r.URL.Path == "/healthz" || isLocalRequest(r) {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if r.URL.Path == hubapi.APIVersion+"/admin/snapshot" {
-			s.logf("hub: refused to send the state snapshot to %s over plain HTTP", r.RemoteAddr)
-			hubapi.WriteError(w, http.StatusUpgradeRequired,
-				"the snapshot holds the hub's signing key and is sent only over TLS; "+
-					"upgrade locnet-hub on the standby to 0.10.4 or later and run it with "+
-					"-follow-fingerprint (the hub's fingerprint, from: locnet-hub fingerprint)")
-			return
-		}
-		if s.requireTLS {
-			hubapi.WriteError(w, http.StatusUpgradeRequired,
-				"this hub accepts only TLS; upgrade LocNet on this machine to 0.10.4 or later "+
-					"(on Linux: sudo bash deploy.sh from the release)")
-			return
-		}
-		next.ServeHTTP(w, r)
+		hubapi.WriteError(w, http.StatusUpgradeRequired,
+			"this hub is reached only over TLS pinned to its key, which locnetd does by itself; "+
+				"to look by hand: curl -k https://<hub>:8420/healthz")
 	})
-}
-
-// isLoopback reports whether a request came from this machine.
-func isLoopback(remoteAddr string) bool {
-	ap, err := netip.ParseAddrPort(remoteAddr)
-	return err == nil && ap.Addr().Unmap().IsLoopback()
-}
-
-// notePlain records which transport a member's signed request came over, and
-// says so the first time a machine is seen using plain HTTP.
-func (s *Server) notePlain(nodeID string, r *http.Request) {
-	plain := r.TLS == nil && !isLoopback(r.RemoteAddr)
-	s.plainMu.Lock()
-	defer s.plainMu.Unlock()
-	if s.plainNodes == nil {
-		s.plainNodes = map[string]bool{}
-	}
-	was, known := s.plainNodes[nodeID]
-	s.plainNodes[nodeID] = plain
-	if plain && (!known || !was) {
-		name := nodeID
-		if n, ok := s.store.NodeName(nodeID); ok {
-			name = n
-		}
-		s.logf("hub: %s talks to the hub over plain HTTP — upgrade LocNet there to 0.10.4 or later", name)
-	}
-}
-
-// usesPlain reports whether a member's last signed request was plain HTTP.
-func (s *Server) usesPlain(nodeID string) bool {
-	s.plainMu.Lock()
-	defer s.plainMu.Unlock()
-	return s.plainNodes[nodeID]
 }
 
 // handleSnapshot hands a standby hub a copy of the whole register.
 //
 // Everything in it is already on the primary's disk; what makes this endpoint
 // sensitive is that it puts the signing key on the wire. It is behind the
-// admin token, and the standby that reads it becomes as trusted as the hub
-// itself — which is the trade a warm spare is.
+// admin token, it leaves this machine only inside TLS (transportGate), and the
+// standby that reads it becomes as trusted as the hub itself — which is the
+// trade a warm spare is.
 func (s *Server) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 	raw, err := s.store.Snapshot()
 	if err != nil {
@@ -254,7 +193,6 @@ func (s *Server) JoinCodeFor(token string) (string, error) {
 		HubAddrs:       s.advertiseAddrs,
 		HubFingerprint: s.store.HubKey().Public().Fingerprint(),
 		Token:          [16]byte(raw),
-		TLS:            s.store.HubTLS(),
 	}
 	return c.Encode()
 }
@@ -400,36 +338,23 @@ func (s *Server) authenticate(w http.ResponseWriter, r *http.Request, body []byt
 		hubapi.WriteError(w, http.StatusUnauthorized, "%v", err)
 		return "", false
 	}
-	if r.Method == http.MethodPost && !replaySafe[r.URL.Path] &&
-		!s.replay.first(r.Header.Get(hubapi.HeaderSignature)) {
+	if r.Method == http.MethodPost && !s.replay.first(r.Header.Get(hubapi.HeaderSignature)) {
 		s.logf("hub: refused a replayed %s from %s (signed by %s)", r.URL.Path, r.RemoteAddr, nodeID)
 		hubapi.WriteError(w, http.StatusConflict, "this exact request was already received; send it again")
 		return "", false
 	}
-	s.notePlain(nodeID, r)
 	return nodeID, true
-}
-
-// replaySafe are the signed POSTs that change nothing when repeated, and that
-// agents older than 0.10.4 — which add no nonce — can legitimately send twice
-// in one second: a claim that found nothing is asked again at once.
-var replaySafe = map[string]bool{
-	hubapi.APIVersion + "/report":         true,
-	hubapi.APIVersion + "/queue/claim":    true,
-	hubapi.APIVersion + "/queue/list":     true,
-	hubapi.APIVersion + "/queue/result":   true,
-	hubapi.APIVersion + "/manage/nodes":   true,
-	hubapi.APIVersion + "/manage/invites": true,
-	hubapi.APIVersion + "/manage/audit":   true,
 }
 
 // replayGuard remembers the signatures of requests that changed something,
 // for as long as their timestamps would still be accepted.
 //
-// Agents from before 0.10.4 talk plain HTTP, and a signed request was good
-// for five minutes in either direction: anyone who could see the traffic
-// could send an administrator's "remove", "approve" or "cancel", or a queue
-// submission, again. A signature is accepted once.
+// A signed request is good for five minutes either side of the hub's clock.
+// TLS keeps it off the wire, but a request that changes something should
+// still never count twice — a retried "remove" or "cancel", or a queue
+// submission, sent again by anything that captured it. Agents put a nonce in
+// every signed body, so a genuine repeat is never identical; a signature is
+// accepted once.
 type replayGuard struct {
 	mu     sync.Mutex
 	seen   map[string]time.Time

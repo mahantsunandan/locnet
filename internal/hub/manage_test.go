@@ -3,6 +3,7 @@ package hub
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -59,13 +60,15 @@ func (f *hubFixture) join(t *testing.T, name string) member {
 	return member{id: n.ID, name: n.Name, priv: priv}
 }
 
-// call makes a signed request from m, arriving from an address that is not
-// the hub machine's own, and returns the status and body.
+// call makes a signed request from m, arriving over TLS from an address that
+// is not the hub machine's own, and returns the status and body.
 func (f *hubFixture) call(t *testing.T, m member, path string, in any) (int, []byte) {
 	t.Helper()
 	raw, _ := json.Marshal(in)
+	raw = hubapi.WithNonce(raw) // as every agent does
 	req := httptest.NewRequest(http.MethodPost, hubapi.APIVersion+path, bytes.NewReader(raw))
 	req.RemoteAddr = "198.51.100.7:40000"
+	req.TLS = &tls.ConnectionState{}
 	hubapi.SignRequest(req, m.id, m.priv, raw)
 	rec := httptest.NewRecorder()
 	f.handler.ServeHTTP(rec, req)

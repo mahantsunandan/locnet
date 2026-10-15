@@ -11,8 +11,6 @@
 //   - a 16-byte fingerprint of the hub's identity key
 //   - a 16-byte auth token the hub will recognise
 //
-// plus a flag saying the hub must be reached over TLS (see package hubtls).
-//
 // Several addresses matter more than it sounds. A hub behind NAT has a LAN
 // address its neighbours use and a public address everyone else uses, and no
 // single one works from both sides — a router that will not hairpin means the
@@ -23,7 +21,8 @@
 // The fingerprint is the part that matters for security. Without it, the first
 // contact with a hub would be trust-on-first-use and a machine on the same
 // network could answer in the hub's place. With it, locnetd refuses to talk to
-// anything whose identity key does not hash to the expected value, so the code
+// anything whose identity key does not hash to the expected value — the TLS
+// handshake with the hub is pinned to it (package hubtls) — so the code
 // is safe to send over a channel you do not fully trust — the token alone is
 // useless against the real hub, and the fingerprint alone cannot be forged.
 //
@@ -55,11 +54,6 @@ const (
 	tokenLen = 16
 	// magic(2) version(1) flags(1) fingerprint(16) token(16) count(1) crc(4)
 	fixedLen = 2 + 1 + 1 + fpLen + tokenLen + 1 + 4
-	// flagTLS says the hub serves TLS pinned to the fingerprint, so a
-	// joining machine never sends the token in the clear. The flags byte was
-	// reserved and is ignored by older parsers, which keep using plain HTTP
-	// against a hub that still accepts it.
-	flagTLS = 1 << 0
 	// maxAddrs bounds a code. More than a handful is a configuration
 	// mistake, and every one of them is an address a joining machine will
 	// sit and wait on.
@@ -82,9 +76,6 @@ type Code struct {
 	HubFingerprint [fpLen]byte
 	// Token authenticates the join request to the hub.
 	Token [tokenLen]byte
-	// TLS is set by hubs from 0.10.4 on: bare host:port addresses must be
-	// reached over TLS pinned to HubFingerprint, never plain HTTP.
-	TLS bool
 }
 
 // Primary is the first address, for messages that need to name just one.
@@ -113,11 +104,7 @@ func (c Code) Encode() (string, error) {
 	}
 
 	buf := make([]byte, 0, fixedLen+64)
-	var flags byte
-	if c.TLS {
-		flags |= flagTLS
-	}
-	buf = append(buf, magic0, magic1, version2, flags)
+	buf = append(buf, magic0, magic1, version2, 0 /* flags, reserved */)
 	buf = append(buf, c.HubFingerprint[:]...)
 	buf = append(buf, c.Token[:]...)
 	buf = append(buf, byte(len(c.HubAddrs)))
@@ -165,7 +152,6 @@ func Parse(s string) (Code, error) {
 	if payload[0] != magic0 || payload[1] != magic1 {
 		return c, fmt.Errorf("%w: not a LocNet code", ErrMalformed)
 	}
-	c.TLS = payload[3]&flagTLS != 0
 	p := payload[4:]
 	c.HubFingerprint = [fpLen]byte(p[:fpLen])
 	p = p[fpLen:]

@@ -98,10 +98,10 @@ let anyone in, and `locnet peers` marks them with `!`. The usual causes:
 
 ---
 
-## The old in-browser viewer
+## No viewer of its own
 
-Versions before 0.9 had their own screen protocol and a viewer in the console
-(`locnet screen`, `locnet desktop share`). The viewer was removed — RDP and VNC
-clients do the job better — and `locnet screen` now says so. `locnet desktop`
-still manages the old setting; `locnet desktop stop` turns it off, and the
-console's This machine page offers the same when it finds it still on.
+LocNet has no screen viewer or screen protocol of its own: RDP and VNC clients
+do that job better, and `locnet screen` says so and points at them.
+`locnet desktop` manages the setting that offers this machine's screen to named
+peers; `locnet desktop stop` turns it off, and the console's This machine page
+offers the same whenever it finds it on.

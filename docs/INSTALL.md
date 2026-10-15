@@ -284,11 +284,8 @@ remembers the setting across restarts.
 To re-run the installer is to upgrade: it stops the service, replaces the
 binaries and starts it again, keeping the machine's identity and membership.
 
-Upgrading to 0.10.4 or later can happen in any order — hub first or machines
-first — because the hub keeps answering older agents in plain HTTP and newer
-agents fall back to it for an older hub. The one ordering that matters is a
-standby hub: upgrade the primary first (see
-[OPERATIONS.md](OPERATIONS.md#a-second-hub)).
+Upgrade the hub first, then the other machines, so that no machine expects
+something its hub does not offer yet. A standby hub goes after its primary.
 
 Optional, for more reliable direct paths:
 
@@ -370,11 +367,9 @@ Windows lock screen if the session is locked.
 
 ### What screen sharing sets up on Linux
 
-Earlier versions installed a VNC server and stopped there, on the reasoning
-that starting one is the operator's decision. The result was worse than either
-choice: the machine reported the package as present, nothing listened on the
-port, and from a peer that is indistinguishable from a machine with no VNC at
-all. So setup now finishes the job.
+Setup does not stop at installing a VNC package. A package that is present
+with nothing listening on the port is, from a peer, indistinguishable from a
+machine with no VNC at all — so setup also starts the server and publishes it.
 
 It creates a **virtual desktop** — Xvnc hosting a display of its own on `:1` —
 rather than sharing the screen you are sitting in front of. That is not a
@@ -477,19 +472,6 @@ locnet-hub approve unit-01
 ```
 
 Existing machines stay approved — the setting governs what happens next.
-
-### Turn off plain HTTP
-
-Agents from 0.10.4 on reach the hub over TLS by themselves. Older ones use
-plain HTTP on the same port until they are upgraded. Once `locnet-hub nodes`
-no longer ends with "Still talking to the hub without TLS", refuse it:
-
-```bash
-echo 'LOCNET_HUB_FLAGS=-require-tls' | sudo tee -a /etc/locnet/hub.env
-sudo systemctl restart locnet-hub
-```
-
-See [OPERATIONS.md](OPERATIONS.md#turning-plain-http-off).
 
 ### Restrict who can reach what
 
@@ -650,17 +632,18 @@ machine joined. Either the hub's key was regenerated (`hub.json` recreated —
 rejoin with a fresh code: `sudo locnet join <code>`), or something is answering
 on the hub's address in its place. LocNet sent it nothing.
 
-### `the hub at X answered in plain HTTP, but it is known to speak TLS`
+### `the hub at X answered without TLS, so it is not the hub this machine joined`
 
-This machine knows its hub serves TLS, and something at that address answered
-without it: a hub reinstalled from a release older than 0.10.4, or someone in
-the way. Nothing was sent. Upgrade the hub (`sudo bash deploy.sh --hub`, or
-`sudo ./install.sh --hub` from a current release).
+Something at the hub's address answered in plain HTTP. A LocNet hub never
+does that to another machine, so it is a different program on that port — a
+wrong port forward, another service on 8420 — or someone in the way. Nothing
+was sent. Check what is listening on the hub: `sudo ss -ltnp | grep 8420`.
 
-### `this hub accepts only TLS; upgrade LocNet on this machine`
+### `this hub is reached only over TLS pinned to its key`
 
-The hub runs with `-require-tls` and this machine's agent is older than
-0.10.4. Upgrade it (re-run the installer from a current release).
+Something spoke plain HTTP to the hub from another machine — a browser, a
+script, or curl without `https://`. LocNet's own programs never do. To look at
+the hub by hand: `curl -k https://<hub>:8420/healthz`.
 
 ### `timestamp is 8m21s away from hub time`
 

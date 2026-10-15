@@ -536,7 +536,7 @@ func cmdDoctor() error {
 	default:
 		fmt.Printf("✓ hub %s is answering\n", st.HubAddr)
 		if note := node.TransportNote(st.HubTransport); st.HubTransport == "http" {
-			fmt.Printf("! control plane %s.\n  Upgrade the hub: sudo bash deploy.sh --hub (from a 0.10.4 or later release)\n", note)
+			fmt.Printf("! control plane %s.\n  Rejoin with a code from the hub, whose addresses are TLS: sudo locnet join <code>\n", note)
 		} else if note != "" {
 			fmt.Printf("✓ control plane %s\n", note)
 		}

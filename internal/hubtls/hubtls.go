@@ -22,10 +22,10 @@
 // client's random bytes first, which would make the hub sign 32 bytes of the
 // client's choosing.
 //
-// The hub serves TLS and plain HTTP on the same port during the transition to
-// encrypted agents. A TLS connection's first byte is always 0x16 (a handshake
-// record) and an HTTP request's is a letter, so one look tells them apart; see
-// Listen.
+// The hub also answers plain HTTP on the same port, but only to its own
+// loopback address, where its admin commands run. A TLS connection's first
+// byte is always 0x16 (a handshake record) and an HTTP request's is a letter,
+// so one look tells them apart; see Listen.
 package hubtls
 
 import (
@@ -143,13 +143,12 @@ func verifyPin(certs []*x509.Certificate, fp [16]byte) error {
 }
 
 // ErrPlainServer is a TLS client meeting a server that answered in plain
-// HTTP: a hub from before 0.10.4.
-var ErrPlainServer = errors.New("the hub answered in plain HTTP (it is older than 0.10.4)")
+// HTTP — not a LocNet hub, or something in the way pretending to be one.
+var ErrPlainServer = errors.New("the server answered in plain HTTP, not TLS — it is not a LocNet hub")
 
-// IsPlainServer reports whether err came from a hub that does not speak TLS.
-// It is the only TLS failure that may ever be a reason to try plain HTTP: a
-// wrong key, a reset or a timeout must not be, or anyone on the path could
-// switch the encryption off by interfering with the handshake.
+// IsPlainServer reports whether err came from a server that does not speak
+// TLS, so callers can say so plainly instead of reporting a handshake error.
+// It is never a reason to retry without TLS.
 func IsPlainServer(err error) bool { return errors.Is(err, ErrPlainServer) }
 
 // handshakeTimeout bounds a TLS handshake with the hub, as the dial is.

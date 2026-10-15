@@ -376,9 +376,8 @@ flags: `-hub <url>` (default `http://127.0.0.1:8420`), `-state-dir <dir>`,
 
 ### `locnet-hub serve [flags]`
 
-Runs the hub: the control plane (TCP — TLS pinned to the hub's key, and plain
-HTTP for agents older than 0.10.4) and relay (UDP) on `-listen`, and WebShare on
-80/443 once a domain is set.
+Runs the hub: the control plane (TCP, TLS pinned to the hub's key) and relay
+(UDP) on `-listen`, and WebShare on 80/443 once a domain is set.
 
 | Flag | |
 |---|---|
@@ -387,7 +386,6 @@ HTTP for agents older than 0.10.4) and relay (UDP) on `-listen`, and WebShare on
 | `-state-dir <dir>` | where the network database lives |
 | `-network <name>` `-prefix <cidr>` | first run only |
 | `-follow <addr> -follow-token <t> [-follow-fingerprint <fp>] [-follow-every 1m]` | run as a standby mirroring a primary, over TLS pinned to `<fp>` (`locnet-hub fingerprint` on the primary; needed only before the first copy) |
-| `-require-tls` | refuse plain HTTP from other machines, once every agent is 0.10.4 or later |
 | `-standby a,b` | standby hubs, told to every node |
 | `-web-http :80` `-web-https :443` | WebShare listeners |
 | `-acme-directory <url>` | certificate authority (default Let's Encrypt production) |
@@ -399,7 +397,7 @@ HTTP for agents older than 0.10.4) and relay (UDP) on `-listen`, and WebShare on
 | `locnet-hub invite [-label] [-uses N] [-ttl 24h]` | a join code |
 | `locnet-hub invites` | join codes |
 | `locnet-hub revoke <code-start>` | disable one |
-| `locnet-hub nodes [-json]` | machines on the network, and any still talking to the hub without TLS |
+| `locnet-hub nodes [-json]` | machines on the network |
 | `locnet-hub approve <machine>` | admit a waiting machine |
 | `locnet-hub remove <machine>` | take one off |
 | `locnet-hub admins [add\|remove <machine>]` | who may administer from their own machine |

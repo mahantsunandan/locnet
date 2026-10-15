@@ -145,7 +145,6 @@ func cmdServe(args []string) error {
 	followToken := fs.String("follow-token", "", "the primary's admin token, for -follow")
 	followFP := fs.String("follow-fingerprint", "", "the primary's fingerprint (locnet-hub fingerprint on it), for -follow; "+
 		"not needed once this standby holds a copy")
-	requireTLS := fs.Bool("require-tls", false, "refuse plain HTTP from other machines — set once every agent is 0.10.4 or later")
 	followEvery := fs.Duration("follow-every", 0, "how often a standby re-copies the primary (default 1m)")
 	standby := fs.String("standby", "", "comma-separated addresses of standby hubs, told to every node")
 	webHTTP := fs.String("web-http", ":80", "WebShare: where to answer certificate challenges, once a domain is set")
@@ -182,9 +181,6 @@ func cmdServe(args []string) error {
 			}
 			m.Fingerprint = fp
 			logf("hub: standby copies over TLS pinned to %x", fp)
-		} else if strings.HasPrefix(*follow, "http://") {
-			logf("hub: WARNING: -follow %s copies the hub's signing key and admin token in the clear; "+
-				"use the bare host:port once the primary is 0.10.4 or later", *follow)
 		}
 		logf("hub: standby for %s, copying every %s. Nothing is served until promotion.",
 			*follow, followInterval(*followEvery))
@@ -210,10 +206,8 @@ func cmdServe(args []string) error {
 	if *standby != "" {
 		srv.SetStandbyAddrs(splitList(*standby))
 	}
-	srv.SetRequireTLS(*requireTLS)
-
-	// One port, both protocols: TLS pinned to the hub's identity key for
-	// agents from 0.10.4 on, plain HTTP for older ones until -require-tls.
+	// TLS pinned to the hub's identity key, and plain HTTP on the same port
+	// for this machine's own admin commands only.
 	tcpLn, err := net.Listen("tcp", *listen)
 	if err != nil {
 		return fmt.Errorf("api: %w", err)
@@ -248,12 +242,7 @@ func cmdServe(args []string) error {
 	net0 := store.Network()
 	logf("hub: network %q on %s, advertising %s", net0.Name, net0.Prefix, strings.Join(advAddrs, ", "))
 	logf("hub: fingerprint %x", store.HubKey().Public().Fingerprint())
-	plainFor := "for agents older than 0.10.4"
-	if *requireTLS {
-		plainFor = "from this machine only"
-	}
-	logf("hub: api on %s/tcp (TLS pinned to the fingerprint, plain HTTP %s), relay on %s/udp",
-		*listen, plainFor, *listen)
+	logf("hub: api on %s/tcp (TLS pinned to the fingerprint), relay on %s/udp", *listen, *listen)
 	if *standby != "" {
 		logf("hub: standby hubs advertised to every node: %s", *standby)
 	}
@@ -662,7 +651,6 @@ func cmdNodes(args []string) error {
 		Online bool     `json:"online"`
 		Groups []string `json:"groups"`
 		Relay  string   `json:"relay_addr"`
-		Plain  bool     `json:"plain_http"`
 	}
 	if err := c.call(http.MethodGet, "/admin/nodes", nil, &rows); err != nil {
 		return err
@@ -680,11 +668,7 @@ func cmdNodes(args []string) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "NAME\tADDRESS\tOS\tSTATUS\tGROUPS\tDISK\tLAST SEEN")
 	waiting := 0
-	var plain []string
 	for _, r := range rows {
-		if r.Plain {
-			plain = append(plain, r.Name)
-		}
 		status := "offline"
 		if r.Online {
 			status = "online"
@@ -707,11 +691,6 @@ func cmdNodes(args []string) error {
 	w.Flush()
 	if waiting > 0 {
 		fmt.Printf("\n  %d machine(s) waiting for approval. Admit one with: locnet-hub approve <name>\n", waiting)
-	}
-	if len(plain) > 0 {
-		fmt.Printf("\n  Still talking to the hub without TLS: %s.\n"+
-			"  Upgrade LocNet there; once none are left, add -require-tls to locnet-hub serve.\n",
-			strings.Join(plain, ", "))
 	}
 	return nil
 }

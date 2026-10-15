@@ -17,7 +17,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/mahantsunandan/locnet/internal/hubapi"
@@ -68,7 +67,7 @@ func TransportNote(t string) string {
 	case "https":
 		return "encrypted, through a TLS proxy"
 	case "http":
-		return "not encrypted: the hub is older than 0.10.4, or its address says http://"
+		return "not encrypted: this machine's hub address says http://"
 	}
 	return ""
 }
@@ -100,7 +99,7 @@ type Status struct {
 	HubOK bool `json:"hub_ok,omitempty"`
 	// HubTransport is how the hub last answered: "tls" (pinned to its
 	// fingerprint), "https" (through a proxy with a real certificate) or
-	// "http" (in the clear: a hub older than 0.10.4, or an http:// address).
+	// "http" (in the clear, because the address says http://).
 	HubTransport string `json:"hub_transport,omitempty"`
 
 	Stats    resource.Stats     `json:"stats,omitzero"`
@@ -204,11 +203,6 @@ type Engine struct {
 	// pinnedHC reaches bare hub addresses over TLS pinned to pinnedFP.
 	pinnedHC *http.Client
 	pinnedFP [16]byte
-	// plainHubs are bare addresses that answered a TLS handshake in plain
-	// HTTP — a hub older than 0.10.4 — and when. They are spoken to in
-	// plain HTTP until plainRetry has passed, unless the hub is known to do
-	// TLS, in which case that answer is refused instead.
-	plainHubs map[string]time.Time
 	// wgPeers is the peer set WireGuard was last configured with, so a new
 	// netmap can be applied as a difference rather than as a replacement.
 	// See wgUpdate for why that distinction is not a micro-optimisation.
@@ -299,10 +293,8 @@ func (e *Engine) Join(ctx context.Context, code string) error {
 	}
 	// Everything from here talks to the hub the code names, not the one in
 	// the state file (if any): the TLS pin comes from the code too, so the
-	// token goes only to that hub, and never in the clear to a hub that
-	// minted a code saying it speaks TLS.
-	jp := &joinPin{fp: c.HubFingerprint, required: c.TLS}
-	ctx = context.WithValue(ctx, joinPinKey{}, jp)
+	// token goes only to that hub.
+	ctx = context.WithValue(ctx, joinPinKey{}, c.HubFingerprint)
 
 	// Try every address the code carries and keep the first that answers.
 	// A hub behind NAT publishes both a LAN and a public address, and which
@@ -344,7 +336,6 @@ func (e *Engine) Join(ctx context.Context, code string) error {
 	e.st.SetHubs(c.HubAddrs)
 	e.hubPref = reachable
 	e.st.SetFingerprint(c.HubFingerprint)
-	e.st.HubTLS = c.TLS || jp.sawTLS.Load() || nm.Network.HubTLS
 	e.st.JoinToken = req.Token
 	e.st.NodeID = resp.NodeID
 	e.st.Name = resp.Name
@@ -598,12 +589,6 @@ func (e *Engine) pollOnce(ctx context.Context) (bool, error) {
 
 	e.mu.Lock()
 	e.st.CachedNetMap, _ = json.Marshal(resp.NetMap)
-	if nm.Network.HubTLS && !e.st.HubTLS {
-		// The map is verified, so this cannot have been injected by
-		// someone on the path — even if this request itself was plain.
-		e.st.HubTLS = true
-		e.logf("hub: the hub serves TLS; plain HTTP to it is now refused")
-	}
 	if nm.Self.IP.IsValid() {
 		e.st.IP = nm.Self.IP
 	}
@@ -1631,57 +1616,40 @@ func stripScheme(s string) string {
 	return s
 }
 
-// plainRetry is how long a bare address that answered in plain HTTP is
-// spoken to that way before TLS is tried on it again — so an agent notices
-// within minutes that its hub has been upgraded, even before a netmap says.
-const plainRetry = 10 * time.Minute
-
 // hubRoute is how one hub address is reached.
 type hubRoute struct {
 	url    string // scheme://host:port
 	client *http.Client
 	// transport is what Status reports: "tls", "https" or "http".
 	transport string
-	// fallBack allows plain HTTP if the hub turns out to be too old for TLS.
-	fallBack bool
 }
 
-// joinPinKey carries a joinPin in a request context.
+// joinPinKey carries, in a request context, the fingerprint a join in
+// progress pins: the code's, not the state file's.
 type joinPinKey struct{}
 
-// joinPin is the hub identity a join in progress talks to: the code's, not
-// the state file's.
-type joinPin struct {
-	fp       [16]byte
-	required bool
-	sawTLS   atomic.Bool
-}
-
-// pin returns the fingerprint to pin the hub to, whether TLS is required,
-// and false when there is none — before the first join, or in tests.
-func (e *Engine) pin(ctx context.Context) (fp [16]byte, required, ok bool) {
-	if jp, _ := ctx.Value(joinPinKey{}).(*joinPin); jp != nil {
-		return jp.fp, jp.required, true
+// pin returns the fingerprint to pin the hub to, and false when there is none
+// — before the first join, or in tests.
+func (e *Engine) pin(ctx context.Context) ([16]byte, bool) {
+	if fp, ok := ctx.Value(joinPinKey{}).([16]byte); ok {
+		return fp, true
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.st.HubFingerprint == "" {
-		return fp, false, false
+		return [16]byte{}, false
 	}
 	fp, err := e.st.Fingerprint()
-	if err != nil {
-		return fp, false, false
-	}
-	return fp, e.st.HubTLS, true
+	return fp, err == nil
 }
 
 // route decides how to reach a hub address.
 //
 // A bare host:port — what join codes and netmaps carry — is TLS pinned to
-// the hub's fingerprint, and plain HTTP only while this machine has never
-// learned the hub does TLS and the hub answers a handshake in plain HTTP.
-// An explicit https:// is a TLS proxy with a real certificate, checked the
-// usual way; an explicit http:// is the operator choosing the clear.
+// the hub's fingerprint, always: there is no plain-HTTP fallback for anyone on
+// the path to trigger by pretending the hub does not speak TLS. An explicit
+// https:// is a TLS proxy with a real certificate, checked the usual way; an
+// explicit http:// is the operator choosing the clear.
 func (e *Engine) route(ctx context.Context, addr string) hubRoute {
 	if strings.HasPrefix(addr, "https://") {
 		return hubRoute{url: strings.TrimRight(addr, "/"), client: e.hc, transport: "https"}
@@ -1689,15 +1657,13 @@ func (e *Engine) route(ctx context.Context, addr string) hubRoute {
 	if strings.HasPrefix(addr, "http://") {
 		return hubRoute{url: strings.TrimRight(addr, "/"), client: e.hc, transport: "http"}
 	}
-	plain := hubRoute{url: "http://" + addr, client: e.hc, transport: "http"}
-	fp, required, ok := e.pin(ctx)
+	fp, ok := e.pin(ctx)
 	if !ok {
-		return plain
+		// Nothing to pin to, so nothing secret to send either: this
+		// machine has not joined a network.
+		return hubRoute{url: "http://" + addr, client: e.hc, transport: "http"}
 	}
-	if !required && e.knownPlain(addr) {
-		return plain
-	}
-	return hubRoute{url: "https://" + addr, client: e.pinnedClient(fp), transport: "tls", fallBack: !required}
+	return hubRoute{url: "https://" + addr, client: e.pinnedClient(fp), transport: "tls"}
 }
 
 // pinnedClient returns the client for TLS pinned to fp, made once per
@@ -1715,70 +1681,23 @@ func (e *Engine) pinnedClient(fp [16]byte) *http.Client {
 	return e.pinnedHC
 }
 
-func (e *Engine) knownPlain(addr string) bool {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	at, ok := e.plainHubs[addr]
-	return ok && time.Since(at) < plainRetry
-}
-
-func (e *Engine) notePlainHub(addr string) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if e.plainHubs == nil {
-		e.plainHubs = map[string]time.Time{}
-	}
-	if _, seen := e.plainHubs[addr]; !seen {
-		e.logf("hub %s does not speak TLS (it is older than 0.10.4); using plain HTTP until it is upgraded", addr)
-	}
-	e.plainHubs[addr] = time.Now()
-}
-
-// noteTransport records how the hub answered, and remembers for good that it
-// does TLS once a pinned handshake has worked.
-func (e *Engine) noteTransport(ctx context.Context, r hubRoute) {
-	jp, _ := ctx.Value(joinPinKey{}).(*joinPin)
-	if jp != nil {
-		if r.transport == "tls" {
-			jp.sawTLS.Store(true)
-		}
-		return
-	}
-	e.mu.Lock()
-	e.hubTransport = r.transport
-	if r.transport != "tls" || e.st.HubTLS || e.st.HubFingerprint == "" {
-		e.mu.Unlock()
-		return
-	}
-	e.st.HubTLS = true
-	st := *e.st
-	e.mu.Unlock()
-	e.logf("hub: control plane encrypted (TLS pinned to the hub's fingerprint)")
-	if err := SaveState(e.dir, &st); err != nil {
-		e.logf("could not remember that the hub speaks TLS: %v", err)
-	}
-}
-
 // send makes one request to one hub address. path includes the API version.
 func (e *Engine) send(ctx context.Context, method, addr, path string, body []byte, sign bool) (*http.Response, error) {
 	r := e.route(ctx, addr)
 	resp, err := e.sendVia(ctx, r, method, path, body, sign)
-	if err != nil && r.transport == "tls" && hubtls.IsPlainServer(err) {
-		if !r.fallBack {
-			return nil, fmt.Errorf("the hub at %s answered in plain HTTP, but it is known to speak TLS — "+
-				"refusing to talk to it in the clear. If the hub really was downgraded below 0.10.4, "+
-				"upgrade it again: %w", addr, err)
+	if err != nil {
+		if hubtls.IsPlainServer(err) {
+			return nil, fmt.Errorf("the hub at %s answered without TLS, so it is not the hub this machine "+
+				"joined; nothing was sent: %w", addr, err)
 		}
-		// The handshake failed before any request was sent, so the
-		// retry is not a replay.
-		e.notePlainHub(addr)
-		r = hubRoute{url: "http://" + addr, client: e.hc, transport: "http"}
-		resp, err = e.sendVia(ctx, r, method, path, body, sign)
+		return nil, err
 	}
-	if err == nil {
-		e.noteTransport(ctx, r)
+	if ctx.Value(joinPinKey{}) == nil {
+		e.mu.Lock()
+		e.hubTransport = r.transport
+		e.mu.Unlock()
 	}
-	return resp, err
+	return resp, nil
 }
 
 func (e *Engine) sendVia(ctx context.Context, r hubRoute, method, path string, body []byte, sign bool) (*http.Response, error) {

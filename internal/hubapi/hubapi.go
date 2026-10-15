@@ -169,7 +169,7 @@ func SignRequest(req *http.Request, nodeID string, mk key.MachinePrivate, body [
 // A signature covers method, path, second and body, so two identical requests
 // in the same second carry the same signature — which is what lets the hub
 // refuse a signature it has already seen without refusing a person who did
-// the same thing twice. Hubs ignore the member; older hubs never knew it.
+// the same thing twice. Hubs ignore the member.
 // Anything that is not a JSON object is returned unchanged.
 func WithNonce(body []byte) []byte {
 	if len(body) < 2 || body[0] != '{' {

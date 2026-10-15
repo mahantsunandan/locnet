@@ -350,7 +350,7 @@ func (s *Server) handleDiagnose(w http.ResponseWriter, r *http.Request) {
 		default:
 			add("ok", "Hub answering at "+st.HubAddr, "")
 			if note := node.TransportNote(st.HubTransport); st.HubTransport == "http" {
-				add("warn", "Control plane not encrypted", note+". Upgrade the hub: sudo bash deploy.sh --hub")
+				add("warn", "Control plane not encrypted", note+". Rejoin with a code from the hub: sudo locnet join <code>")
 			} else if note != "" {
 				add("ok", "Control plane "+note, "")
 			}

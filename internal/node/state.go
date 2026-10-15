@@ -34,17 +34,11 @@ type State struct {
 	// neighbours use and the one everyone else uses — because no single
 	// address works from both sides.
 	HubAddrs []string `json:"hub_addrs,omitempty"`
-	// HubAddr is the pre-0.4 single address. Kept only so an existing
-	// installation migrates instead of losing its network on upgrade.
+	// HubAddr is the single address of an early state file format. Kept
+	// only so such a file migrates instead of losing its network.
 	HubAddr        string `json:"hub_addr,omitempty"`
 	HubFingerprint string `json:"hub_fingerprint,omitempty"` // base64 of 16 bytes
 	JoinToken      string `json:"join_token,omitempty"`
-	// HubTLS is set once this machine knows the hub serves TLS pinned to
-	// HubFingerprint — from the join code, a verified netmap, or a pinned
-	// handshake that worked. From then on bare hub addresses are never
-	// spoken to in plain HTTP, so nobody on the path can switch the
-	// encryption off by pretending the hub is too old for it.
-	HubTLS bool `json:"hub_tls,omitempty"`
 
 	// SSHUserKey is the operator's *public* SSH key, offered through
 	// `locnet ssh-keys publish` so peers that accept it can let this person
@@ -95,7 +89,7 @@ func (s *State) Registered() bool {
 	return s.NodeID != "" && len(s.Hubs()) > 0 && s.IP.IsValid()
 }
 
-// Hubs returns the candidate hub addresses, migrating a pre-0.4 state file
+// Hubs returns the candidate hub addresses, migrating an early state file
 // that only knew one.
 func (s *State) Hubs() []string {
 	if len(s.HubAddrs) > 0 {
@@ -207,7 +201,6 @@ func (s *State) Reset() {
 	s.HubAddrs = nil
 	s.HubAddr = ""
 	s.HubFingerprint = ""
-	s.HubTLS = false
 	s.JoinToken = ""
 	s.NodeID = ""
 	s.Name = ""

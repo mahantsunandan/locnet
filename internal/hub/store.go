@@ -177,9 +177,6 @@ type Store struct {
 	// hubAddrs are the control-plane addresses handed to nodes so they know
 	// where to look when the one they were using stops answering.
 	hubAddrs []string
-	// hubTLS is whether the control plane is served over pinned TLS. Not
-	// persisted, for the same reason.
-	hubTLS bool
 	// changed is closed and replaced whenever Version increases. A waiter
 	// grabs the current channel under the lock, releases it, and blocks —
 	// so there is no window where a change can be missed.
@@ -373,25 +370,6 @@ func (s *Store) SetHubAddrs(addrs []string) {
 	}
 	s.hubAddrs = append(s.hubAddrs[:0], addrs...)
 	s.bump()
-}
-
-// SetHubTLS records that the control plane is served over pinned TLS, which
-// every netmap then says. See Server.TLSListener.
-func (s *Store) SetHubTLS(on bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.hubTLS == on {
-		return
-	}
-	s.hubTLS = on
-	s.bump()
-}
-
-// HubTLS reports whether the control plane is served over pinned TLS.
-func (s *Store) HubTLS() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.hubTLS
 }
 
 // Version returns the current netmap version.
@@ -802,7 +780,6 @@ func (s *Store) NetMapFor(nodeID string) (*netmap.Signed, error) {
 	network := s.st.Network
 	network.Health = s.st.Health
 	network.Hubs = append([]string(nil), s.hubAddrs...)
-	network.HubTLS = s.hubTLS
 
 	m := &netmap.NetMap{
 		Version:  s.st.Version,
@@ -829,8 +806,7 @@ func (s *Store) NetMapFor(nodeID string) (*netmap.Signed, error) {
 				// reads as "every port" to the agent, so a one-way rule
 				// used to open the reverse direction completely. Port 0
 				// is never a connection's destination, so this range
-				// grants nothing — and agents from before the fix
-				// enforce it too.
+				// grants nothing.
 				ranges = []policy.PortRange{policy.NoPorts}
 			}
 			peer.InboundPorts = ranges

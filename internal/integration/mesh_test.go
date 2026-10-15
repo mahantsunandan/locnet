@@ -45,12 +45,13 @@ type testHub struct {
 	registers atomic.Int32
 }
 
-// startHub runs a hub as locnet-hub does: TLS pinned to its key and plain
-// HTTP on one port. The plain-HTTP requests most tests here make are what an
-// agent older than 0.10.4 sends, so they double as the compatibility check.
+// startHub runs a hub as locnet-hub does: TLS pinned to its key, plain HTTP
+// on the same port for this machine only. The tests here make their raw API
+// calls from 127.0.0.1, which is that machine.
 func startHub(t *testing.T) *testHub { return startHubTLS(t, true) }
 
-// startHubTLS with withTLS false is a hub from before 0.10.4: plain only.
+// startHubTLS with withTLS false serves plain HTTP only: something that is
+// not a LocNet hub, standing at a hub's address.
 func startHubTLS(t *testing.T, withTLS bool) *testHub {
 	t.Helper()
 
@@ -573,6 +574,7 @@ func (n *testNode) report(t *testing.T, r hubapi.ReportRequest) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	raw = hubapi.WithNonce(raw) // as every agent does
 	url := "http://" + n.hub.addr + hubapi.APIVersion + "/report"
 	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(string(raw)))
 	if err != nil {

@@ -5,11 +5,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
-	"github.com/mahantsunandan/locnet/internal/hubapi"
 	"github.com/mahantsunandan/locnet/internal/key"
-	"github.com/mahantsunandan/locnet/internal/netmap"
 )
 
 // TestNoContentIsNotAFailure covers the bug behind
@@ -91,36 +90,21 @@ func testEngine(t *testing.T) *Engine {
 	return e
 }
 
-// TestSignedMapTurnsTLSOn: an agent that has only ever reached its hub in
-// plain HTTP — the hub was older, or someone on the path made it look older —
-// learns from a verified netmap that the hub speaks TLS, and from then on
-// refuses plain HTTP to it. The map is signed, so the flag cannot be stripped
-// on the way, and it reaches every agent at its next poll.
-func TestSignedMapTurnsTLSOn(t *testing.T) {
-	hubKey, hubPub, err := key.NewMachine()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, wg, _ := key.NewWG()
-	_, disco, _ := key.NewDisco()
-	_, self, _ := key.NewMachine()
-	signed, err := netmap.Sign(&netmap.NetMap{
-		Version: 2,
-		Network: netmap.Network{Name: "n", HubTLS: true},
-		Self:    netmap.Node{ID: "n1", MachineKey: self, WGKey: wg, DiscoKey: disco},
-	}, hubKey)
-	if err != nil {
-		t.Fatal(err)
-	}
+// TestJoinedAgentNeverSpeaksPlainHTTP: once a machine has a hub fingerprint,
+// a bare hub address is TLS pinned to it and nothing else. A server answering
+// in plain HTTP there — something in the way, pretending to be the hub —
+// receives nothing, and the error says why.
+func TestJoinedAgentNeverSpeaksPlainHTTP(t *testing.T) {
+	var got atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/netmap") {
-			hubapi.WriteJSON(w, http.StatusOK, hubapi.NetMapResponse{Changed: true, NetMap: signed})
-			return
-		}
-		w.WriteHeader(http.StatusOK)
+		got.Add(1)
 	}))
 	defer srv.Close()
 
+	_, hubPub, err := key.NewMachine()
+	if err != nil {
+		t.Fatal(err)
+	}
 	e := testEngine(t)
 	addr := srv.Listener.Addr().String()
 	e.mu.Lock()
@@ -129,21 +113,11 @@ func TestSignedMapTurnsTLSOn(t *testing.T) {
 	e.st.NodeID = "n1"
 	e.mu.Unlock()
 
-	if _, err := e.pollOnce(context.Background()); err != nil {
-		t.Fatalf("poll against a plain-HTTP hub: %v", err)
+	_, err = e.pollOnce(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "without TLS") {
+		t.Fatalf("poll against a plain-HTTP server: %v", err)
 	}
-	if !e.State().HubTLS {
-		t.Fatal("a verified netmap saying the hub speaks TLS was ignored")
-	}
-	if got := e.Status().HubTransport; got != "http" {
-		t.Errorf("transport reported as %q, want http", got)
-	}
-
-	// The same plain answer is now refused.
-	e.mu.Lock()
-	e.nm = nil
-	e.mu.Unlock()
-	if _, err := e.pollOnce(context.Background()); err == nil || !strings.Contains(err.Error(), "known to speak TLS") {
-		t.Fatalf("plain HTTP after the hub announced TLS: %v", err)
+	if n := got.Load(); n != 0 {
+		t.Errorf("the plain-HTTP server received %d requests", n)
 	}
 }

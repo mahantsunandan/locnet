@@ -83,10 +83,6 @@ a machine access to others without giving them access back:
   "rules":  [ { "src": ["home"], "dst": ["*"], "comment": "home reaches everything; laptop reaches nothing" } ] }
 ```
 
-Agents before 0.10.3 enforce the "no ports" half but do not track replies,
-so on them a one-way rule also cuts the permitted direction. Upgrade every
-machine that a one-way rule protects.
-
 ### Switching single connections on and off
 
 Rules are for the shape of a network. For "winpc-01 may not SSH to hubpc",
@@ -417,11 +413,7 @@ to the primary's fingerprint, and **serves nothing**. It sends the admin token
 only after the handshake has proved it is talking to that hub, never falls back
 to plain HTTP, and refuses a snapshot of any other hub. `-follow-fingerprint` is
 needed only the first time: a spare that already holds a copy pins the key in
-it, so one set up before 0.10.4 keeps running unchanged once both ends are
-upgraded — primary first, because a 0.10.4 primary will not send the snapshot
-to an older spare in plain HTTP, and a 0.10.4 spare will not take it from an
-older primary that way (it keeps its last copy meanwhile; `-follow
-http://host:port` copies in the clear if you must bridge the gap). Nodes learn its address from the signed network map, so machines
+it. Nodes learn its address from the signed network map, so machines
 that joined a year before the spare existed pick it up without anyone touching
 them.
 
@@ -458,37 +450,6 @@ What a standby does **not** do: it is not a second relay. Nodes that cannot
 reach each other directly still go through whichever hub is serving, so
 promoting a spare in another country will make relayed pairs slower. And it
 does not load-balance — exactly one hub is live at a time, by design.
-
----
-
-## Turning plain HTTP off
-
-From 0.10.4 the hub's control plane is TLS, pinned to the hub's own key (see
-[SECURITY.md](SECURITY.md#what-is-protected) and
-[PROTOCOL.md](PROTOCOL.md#transport)). Agents upgraded to 0.10.4 switch to it
-by themselves; older ones keep using plain HTTP on the same port, which the hub
-still answers so that machines can be upgraded in any order.
-
-To see who is left:
-
-```bash
-locnet-hub nodes        # ends with "Still talking to the hub without TLS: …"
-```
-
-The hub also logs `<machine> talks to the hub over plain HTTP` the first time
-it sees one. When the list is empty, add `-require-tls` to the hub's
-`locnet-hub serve` line and restart it. On Linux that is one line in
-`/etc/locnet/hub.env`:
-
-```bash
-echo 'LOCNET_HUB_FLAGS=-require-tls' | sudo tee -a /etc/locnet/hub.env
-sudo systemctl restart locnet-hub
-```
-
-Plain HTTP is then refused from every other machine with a message saying to
-upgrade; `/healthz` and requests from the hub machine itself still answer.
-
-`locnet doctor` on any machine says whether its control plane is encrypted.
 
 ---
 

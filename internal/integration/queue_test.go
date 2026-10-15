@@ -19,6 +19,7 @@ func (n *testNode) post(t *testing.T, path string, in, out any) int {
 	if err != nil {
 		t.Fatal(err)
 	}
+	raw = hubapi.WithNonce(raw) // as every agent does
 	url := "http://" + n.hub.addr + hubapi.APIVersion + path
 	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(string(raw)))
 	if err != nil {

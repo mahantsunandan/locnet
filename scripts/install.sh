@@ -145,9 +145,8 @@ LOCNET_LISTEN=:8420
 LOCNET_NETWORK=locnet
 LOCNET_PREFIX=10.99.0.0/16
 
-# Extra flags for locnet-hub serve. Once every machine runs 0.10.4 or later
-# (locnet-hub nodes lists any that do not), refuse plain HTTP with:
-#LOCNET_HUB_FLAGS=-require-tls
+# Extra flags for locnet-hub serve (locnet-hub serve -h lists them), e.g.
+#LOCNET_HUB_FLAGS=-standby spare.example.org:8420
 ENV
             chmod 0644 /etc/locnet/hub.env
         fi

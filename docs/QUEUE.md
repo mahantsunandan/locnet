@@ -71,8 +71,8 @@ submitter or an administrator can cancel a job.
 A machine waiting for approval (see
 [OPERATIONS.md](OPERATIONS.md#device-approval)) takes no part: it cannot
 submit, list, cancel, or be handed work, whatever its own compute setting
-says. Before 0.10.4 it could do all four, and by allowing `"*"` it could be
-given anybody's job and report any result it liked.
+says — otherwise, by allowing `"*"` in its own setting, it could be handed
+anybody's job and report any result it liked.
 
 ---
 

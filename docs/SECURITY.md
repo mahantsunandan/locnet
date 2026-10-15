@@ -3,8 +3,7 @@
 What LocNet protects, what it does not, and what an attacker in each position
 can actually do.
 
-This is version 0.1 of a project written to be read and understood. It has not
-been audited. Read this document before putting it anywhere that matters.
+LocNet is written to be read and understood. It has not been audited. Read this document before putting it anywhere that matters.
 
 ---
 
@@ -18,15 +17,15 @@ relay, because neither ever holds the material.
 against a fingerprint that arrived in the join code. Nobody who is not the hub
 can add a peer, change a peer's key, or move a peer's address.
 
-**The control plane in transit.** Since 0.10.4 agents reach the hub over TLS
-1.3 whose certificate key *is* the hub's identity key, and accept the handshake
-only if that key hashes to the fingerprint their join code carried — no CA, no
-Let's Encrypt, nothing to renew. Join codes, every machine's endpoints and LAN
+**The control plane in transit.** Agents reach the hub over TLS 1.3 whose
+certificate key *is* the hub's identity key, and accept the handshake only if
+that key hashes to the fingerprint their join code carried — no CA, no Let's
+Encrypt, nothing to renew. Join codes, every machine's endpoints and LAN
 addresses, the queue's environments and output, and a standby's copy of the
-hub are no longer readable on the wire. Once an agent knows the hub speaks TLS
-(the join code says so, a verified netmap says so, or one pinned handshake
-worked) it never talks plain HTTP to it again, so nobody on the path can switch
-the encryption off by pretending the hub is too old for it. Details in
+hub are not readable on the wire. There is no plain-HTTP fallback, so nobody on
+the path can switch the encryption off by answering in the clear: an agent that
+meets plain HTTP at the hub's address sends nothing. The hub answers plain HTTP
+only from its own machine, for its admin commands. Details in
 [PROTOCOL.md](PROTOCOL.md#transport).
 
 **Control-plane requests.** Signed with the node's identity key over method,
@@ -68,45 +67,21 @@ two machines went direct.
 
 ## What is not protected
 
-### Agents older than 0.10.4 still speak plain HTTP
+### What the hub's operator and the hub's port still reveal
 
-The hub serves TLS and plain HTTP on the same port so that machines can be
-upgraded in any order. Until every agent is 0.10.4 or later, the older ones
-talk in the clear, and a passive observer on their path can read:
+The control plane is encrypted, not hidden. Anyone watching the network sees
+that machines talk to the hub, how often and how much, and anyone can connect
+to port 8420 and learn that a LocNet hub is there: it answers `/healthz`, and
+its certificate names its fingerprint. The hub itself, of course, sees
+everything in the control plane — every member, endpoint, policy and queued
+job; see [A compromised hub is serious](#a-compromised-hub-is-serious)
+for what that does and does not let it do.
 
-- every node's name, overlay address, OS, and public keys
-- every node's endpoint addresses, which is roughly a map of where your
-  machines physically are
-- who is online and when
-- join codes an administrator mints on that machine (`locnet admin invite`)
-
-Nothing can be *forged* over plain HTTP — maps are signed, requests are signed
-and accepted once — but it is not private. `locnet-hub nodes` lists the
-machines still using it, and the hub logs each one the first time it is seen.
-Once none are left, run the hub with `-require-tls`: plain HTTP is then refused
-from every other machine (loopback and `/healthz` still answer).
-
-The standby snapshot is the exception from the start: it holds the hub's
-signing key, and the hub never sends it over plain HTTP to another machine,
-whether or not `-require-tls` is set.
-
-Two edges remain while plain HTTP is allowed:
-
-- **A first join with a code minted before 0.10.4.** Such a code carries no
-  TLS flag. A new agent still tries TLS first, but someone actively on the path
-  could answer as an old plain-HTTP hub, and the agent would then send the join
-  token in the clear. Codes minted from 0.10.4 on carry the flag and are never
-  redeemed in plain HTTP. Mint fresh codes after upgrading the hub.
-- **An agent that has never reached the hub over TLS** can be held on plain
-  HTTP by the same attacker until a signed netmap reaches it — which tells it
-  the hub speaks TLS, after which it refuses plain HTTP. Holding it there
-  means blocking its netmaps, which an attacker on the path can do anyway.
-
-A hub behind a TLS reverse proxy can still be advertised as
+A hub behind a TLS reverse proxy can be advertised as
 `https://hub.example.org:8420`; agents then check the proxy's certificate the
-usual way instead of the pin. An explicit `http://` address is spoken to in
-plain HTTP — that is the operator's choice, and it travels in the signed
-netmap, so nobody else can make it.
+usual way instead of the pin. An explicit `http://` address is spoken to in the
+clear — that is the operator's choice, it travels in the signed netmap so
+nobody else can make it, and the hub answers it only from its own machine.
 
 ### The default policy allows everything
 
@@ -133,12 +108,6 @@ limit: a machine is protected from what reaches it; it is not restrained in
 what it sends. A compromised member can still attempt connections to anything
 the policy lets it reach. Remembered connections expire after an hour idle
 (TCP) or three minutes (UDP), and the table is capped at 65,536 entries.
-
-Agents before 0.10.3 enforce "no ports" but do not remember connections, so a
-one-way rule also cuts the allowed direction on them. Hubs before 0.10.3 sent
-"no ports" as an empty list, which agents read as "every port" — a one-way
-rule then opened the reverse direction completely. Run 0.10.3 or later
-everywhere a one-way rule matters.
 
 It is also IPv4-only. The overlay is IPv4, so this matters only if you add IPv6
 addressing on top yourself.
@@ -220,10 +189,9 @@ directories that exist for the purpose, not `/` or a home directory.
 Every read and write goes through Go's `os.Root`, which refuses to leave the
 share at the moment the file is opened, so a symlink placed inside the share —
 before or during a request — cannot redirect it. Uploads go to a random,
-exclusively created temporary name. Before 0.10.4 the temporary name was
-predictable and opened with truncation, so a local user who could write in a
-read-write share's folder could plant a symlink there and have the next upload
-overwrite any file on the machine as root.
+exclusively created temporary name, so a local user who can write in a
+read-write share's folder cannot plant a symlink at the name the next upload
+will use and have it overwrite another file as root.
 
 ### A shared screen is the most access anything here grants
 
@@ -254,8 +222,9 @@ identity key, so that the maps it signs after promotion verify against the
 fingerprint every node already pinned. That is what makes failover invisible.
 
 It also means a standby is exactly as sensitive as the primary, and that the
-snapshot endpoint puts a signing key on the wire. It is behind the admin token
-and belongs on a network you control. Do not run a standby on a machine you
+snapshot endpoint puts a signing key on the wire. It is behind the admin token,
+travels only inside TLS that the standby pins to the primary's fingerprint
+(`-follow-fingerprint`), and is never sent in the clear to another machine. Do not run a standby on a machine you
 would not run the hub on.
 
 ### A compromised hub is serious
@@ -302,9 +271,8 @@ own membership before you notice.
 WireGuard rekeys and has forward secrecy for tunnel traffic, and so does the
 control plane's TLS 1.3 (ephemeral key exchange): a recording of it cannot be
 decrypted later, even with the hub's key. The signatures inside it are another
-matter: anyone holding a recorded *plain-HTTP* request from an old agent can
-check it against the node's public key forever. That proves who sent it; it
-reveals nothing that was not already on the wire.
+matter: the hub, which sees each request decrypted, could keep one and show it
+to anyone with the node's public key as proof of what that node asked for.
 
 ### The hub's identity key is also its TLS key
 

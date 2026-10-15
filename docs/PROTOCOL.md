@@ -38,13 +38,16 @@ Payload:
 | Offset | Size | Field |
 |---|---|---|
 | 0 | 2 | magic `"LN"` |
-| 2 | 1 | version, `1` |
-| 3 | 1 | flags: bit 0 = the hub serves TLS pinned to the fingerprint (set from 0.10.4); other bits reserved, `0`. Older parsers ignore the byte. |
+| 2 | 1 | version, `2` |
+| 3 | 1 | flags, reserved, `0` |
 | 4 | 16 | hub fingerprint: first 16 bytes of `SHA-256(hub Ed25519 public key)` |
 | 20 | 16 | join token |
-| 36 | 1 | hub address length, *n* |
-| 37 | *n* | hub address, e.g. `hub.example.org:8420` |
-| 37+*n* | 4 | CRC-32 (IEEE) of bytes 0 … 36+*n* |
+| 36 | 1 | number of hub addresses, 1 to 8 |
+| 37 | … | each address: 1 byte length *n*, then *n* bytes, e.g. `hub.example.org:8420` |
+| end − 4 | 4 | CRC-32 (IEEE) of every byte before it |
+
+Addresses are tried in order, most specific first: a hub behind NAT lists its
+LAN address and its public one, so the same code works at home and away.
 
 Base32 uses the lowercase alphabet `abcdefghijklmnopqrstuvwxyz234567` with no
 padding. A parser must accept surrounding whitespace, embedded dashes and
@@ -66,9 +69,11 @@ Base path `/v1`. All bodies are JSON.
 
 ### Transport
 
-One TCP port (8420) serves HTTP/1.1 two ways. The hub reads the first byte of
-each connection: `0x16` (a TLS handshake record) starts TLS, anything else is
-plain HTTP. Plain HTTP exists for agents older than 0.10.4.
+One TCP port (8420). The hub reads the first byte of each connection: `0x16`
+(a TLS handshake record) starts TLS; anything else is plain HTTP, which is
+answered only from the hub's own machine (and on `GET /healthz`). From any
+other machine a plain-HTTP request gets `426 Upgrade Required`. HTTP/1.1 in
+both cases.
 
 **TLS.** TLS 1.3 only, ALPN `http/1.1`. The certificate is self-signed, made
 fresh at every start, and its key is the hub's Ed25519 identity key. The client
@@ -78,26 +83,16 @@ handshake, resumed or not); TLS 1.3's CertificateVerify proves the server holds
 the private key. Nothing else in the certificate — names, validity — is
 checked.
 
-**Which an agent uses**, for a bare `host:port`:
+**Agents.** A bare `host:port` — what join codes and netmaps carry — is always
+reached over pinned TLS: during a join with the code's fingerprint, afterwards
+with the stored one. A server that answers the ClientHello in plain HTTP gets
+nothing; there is no fallback. An address written `https://…` is a TLS proxy
+checked against the system's certificate authorities; one written `http://…`
+is plain HTTP by the operator's choice.
 
-1. If it knows the hub serves TLS — the join code's TLS flag, a verified
-   netmap with `network.hub_tls`, or an earlier pinned handshake that worked
-   (persisted as `hub_tls` in its state) — TLS only. A plain-HTTP answer to
-   the handshake is an error, never a reason to retry in the clear.
-2. Otherwise TLS first. If the server answers the ClientHello in plain HTTP (a
-   hub older than 0.10.4), the same request is sent again in plain HTTP — the
-   handshake failed before anything was sent, so this is not a replay — and
-   the address is spoken to that way for 10 minutes before TLS is tried again.
-   Any other TLS failure, including a wrong key, is a failure of that address.
-
-**What plain HTTP may still do.** Everything, by default, except
-`GET /v1/admin/snapshot` from another machine, which is refused with `426`.
-With `locnet-hub serve -require-tls`, every plain-HTTP request from another
-machine except `GET /healthz` is refused with `426` and an error saying to
-upgrade. Requests from a loopback address are always served.
-
-A standby (`-follow host:port`) pins the primary's fingerprint the same way and
-never falls back to plain HTTP; see [OPERATIONS.md](OPERATIONS.md).
+**Standby.** `locnet-hub serve -follow host:port` pins the primary's
+fingerprint the same way and sends the admin token only after the handshake;
+see [OPERATIONS.md](OPERATIONS.md#a-second-hub).
 
 ### Request authentication
 
@@ -123,15 +118,11 @@ the signature to method and path means it cannot be replayed against a
 different endpoint; the timestamp bounds how long a captured request stays
 useful.
 
-**Replays.** Agents from 0.10.4 add a `"nonce"` member — 24 random hex
-characters — to every signed JSON body, so no two requests carry the same
-signature. The hub accepts a signature on a `POST` once: a second request with
-the same `X-LocNet-Signature` within eleven minutes gets `409 Conflict`. The
-reads and idempotent calls are exempt — `/v1/report`, `/v1/queue/claim`,
-`/v1/queue/list`, `/v1/queue/result`, `/v1/manage/nodes`, `/v1/manage/invites`
-and `/v1/manage/audit` — because older agents, which send no nonce, repeat
-them within a second in normal use. Hubs ignore the nonce member, so a new
-agent works with an old hub.
+**Replays.** Agents add a `"nonce"` member — 24 random hex characters — to
+every signed JSON body, so no two requests carry the same signature. The hub
+accepts a signature on a `POST` once: a second request with the same
+`X-LocNet-Signature` within eleven minutes gets `409 Conflict`. The hub
+otherwise ignores the nonce.
 
 ### `GET /v1/info`
 
@@ -141,7 +132,7 @@ sending anything.
 ```json
 {
   "hub_key": "<base64 Ed25519 public key>",
-  "version": "0.1.0",
+  "version": "0.10.4",
   "relay":   "hub.example.org:8420"
 }
 ```
@@ -236,10 +227,6 @@ list is capped at 8.
 `Authorization: Bearer <admin token>`, compared in constant time. The token is
 generated at first run and stored in the hub's state file.
 
-Rows from `GET /v1/admin/nodes` and `POST /v1/manage/nodes` carry
-`"plain_http": true` while that machine's last signed request came over plain
-HTTP from another machine — an agent older than 0.10.4.
-
 ### Management endpoints (signed by an administrator machine)
 
 `POST /v1/manage/<op>`, signed like every node request and accepted only from
@@ -296,7 +283,7 @@ Payload:
   "network": {
     "id": "homelab", "name": "homelab",
     "prefix": "10.99.0.0/16", "domain": "locnet.private", "mtu": 1280,
-    "hubs": ["192.168.1.64:8420", "hub.example.org:8420"], "hub_tls": true
+    "hubs": ["192.168.1.10:8420", "hub.example.org:8420"]
   },
   "self":  { "…": "this node" },
   "peers": [ { "…": "every other node" } ],
@@ -334,9 +321,6 @@ The node's own `self` entry may carry `"sites": [{"name", "url", "state",
 "live"}]`: how its WebShare sites stand. Only a node's own entry has it.
 
 `network.hubs` is every control-plane address, standbys included.
-`network.hub_tls` says the hub serves pinned TLS: a node that verifies a map
-carrying it never speaks plain HTTP to a bare hub address again (see
-[Transport](#transport)).
 
 `version` increases on every change a node would care about. Reporting
 unchanged endpoints does not bump it, so a large idle fleet does not wake every
@@ -512,8 +496,7 @@ On Windows every request carries `X-LocNet-Control: <token>`.
 
 | | |
 |---|---|
-| Hub API and relay port | 8420 (TCP and UDP); TCP is TLS 1.3 or plain HTTP |
-| Plain-HTTP hub retried for TLS after | 10 min |
+| Hub API and relay port | 8420 (TCP and UDP); TCP is TLS 1.3 |
 | Node WireGuard/disco port | 41820 (UDP) |
 | Node share server port | 8421 (TCP, overlay address only) |
 | Overlay prefix | `10.99.0.0/16` |

@@ -136,9 +136,8 @@ func (s *Server) handleQueueList(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		ID string `json:"id,omitempty"`
-		// Brief asks for the listing without each job's output. Optional so
-		// that an older agent, which does not send it, still gets the whole
-		// thing it expects.
+		// Brief asks for the listing without each job's output; without it,
+		// the listing is whole.
 		Brief bool `json:"brief,omitempty"`
 	}
 	_ = json.Unmarshal(body, &req)

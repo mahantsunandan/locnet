@@ -120,21 +120,22 @@ verifies it against a fingerprint that came in its join code. Every request a
 node makes is signed with the node's own key over a canonical summary of the
 request.
 
-That made the control plane safe over plain HTTP — an attacker who can read
-and rewrite the wire still cannot add a peer, move a peer's address, or hand a
-node a key it will trust — but not private: join codes, endpoints and a
-standby's copy of the hub key were all readable. Since 0.10.4 it is TLS 1.3,
-and the same fingerprint does the job a certificate authority would: the hub's
+Signatures make the control plane authentic — an attacker who can read and
+rewrite the wire still cannot add a peer, move a peer's address, or hand a node
+a key it will trust — but not private: join codes, endpoints and a standby's
+copy of the hub key would all be readable. So it also runs over TLS 1.3, and
+the same fingerprint does the job a certificate authority would: the hub's
 certificate is self-signed with its identity key, and a node accepts the
 handshake only if that key hashes to the fingerprint it already pins
 (`internal/hubtls`). No CA, no trust-on-first-use, no public DNS name, nothing
-to renew. Signing stays underneath, unchanged, so a map or request is just as
-trustworthy whichever way it arrived.
+to renew. Signing stays underneath, unchanged, so a map or request does not
+depend on the transport for its trustworthiness.
 
-The hub serves TLS and plain HTTP on one port, told apart by the first byte, so
-agents can be upgraded in any order; once a node knows the hub does TLS it
-never falls back, and `-require-tls` ends the transition. See
-[PROTOCOL.md](PROTOCOL.md#transport) and [SECURITY.md](SECURITY.md).
+There is no plain-HTTP fallback: a fallback is a switch anyone on the path can
+flip by answering in the clear. The hub answers plain HTTP only from its own
+machine, where its admin commands run, telling the two apart by the first byte
+of each connection. See [PROTOCOL.md](PROTOCOL.md#transport) and
+[SECURITY.md](SECURITY.md).
 
 ### The hub stores JSON, not SQL
 
@@ -197,7 +198,7 @@ internal/
   joincode/        the pasteable code: encode, parse, redact
   netmap/          the network map and its signature envelope
   hubapi/          wire types and the request-signing scheme
-  hubtls/          the control plane's TLS: certificate from the hub key, pinned verification, TLS/plain on one port
+  hubtls/          the control plane's TLS: certificate from the hub key, pinned verification
   hub/             store, HTTP server, UDP relay, job queue, audit,
                    standby mirror, WebShare (sites, proxy, ACME, DuckDNS)
   policy/          groups, rules and blocks; port-set arithmetic; the access

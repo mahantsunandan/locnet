@@ -58,8 +58,8 @@ const mirrorInterval = time.Minute
 type Mirror struct {
 	// From is the primary's address. A bare host:port is reached over TLS
 	// pinned to Fingerprint; an https:// URL through a proxy with a real
-	// certificate; an http:// URL in the clear, which a primary from 0.10.4
-	// on refuses unless it is this machine.
+	// certificate; an http:// URL in the clear, which a primary answers only
+	// from its own machine.
 	From string
 	// Fingerprint pins the primary's identity key, as a join code does.
 	// See MirrorPin.
@@ -156,8 +156,8 @@ func (m *Mirror) promoted() bool {
 // is the hub's master password, so a standby must know it is talking to the
 // real primary before it sends either: the same 16-byte fingerprint a join
 // code carries. It comes from -follow-fingerprint, or, for a standby that
-// has synced before, from the copy already on disk — which is what lets a
-// standby set up before 0.10.4 keep running without a new flag.
+// has synced before, from the copy already on disk, so the flag is needed
+// only the first time.
 func MirrorPin(statePath, flagHex string) ([16]byte, error) {
 	var fp [16]byte
 	if flagHex != "" {
@@ -229,11 +229,10 @@ func (m *Mirror) once(ctx context.Context) error {
 	resp, err := m.httpClient().Do(req)
 	if err != nil {
 		if hubtls.IsPlainServer(err) {
-			// Never fall back on our own: that would hand the admin token
-			// to anyone able to fake an old hub's answer. The operator can
-			// choose the clear with an explicit http:// address.
-			err = fmt.Errorf("the primary at %s does not speak TLS — upgrade the primary first "+
-				"(hub before standby), or follow http://%s to copy in the clear meanwhile", m.From, m.From)
+			// Never retry in the clear: that would hand the admin token to
+			// anyone able to answer in plain HTTP at the primary's address.
+			err = fmt.Errorf("the primary at %s answered without TLS, so it is not the hub this standby "+
+				"follows; nothing was sent. Check -follow names the primary: %w", m.From, err)
 		}
 		m.note(err)
 		return err
