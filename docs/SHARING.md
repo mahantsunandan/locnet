@@ -210,7 +210,7 @@ cannot grant itself a folder on your machine.
 **The authenticator is the overlay source address.** That is not the usual weak
 "trust the source IP". The share server binds the overlay address only, so the
 only way to reach it is through the tunnel, and WireGuard's allowed-IP check
-means a packet from `100.100.0.3` was decrypted with that node's private key.
+means a packet from `10.99.0.3` was decrypted with that node's private key.
 There is no token to steal, because the tunnel already answered the question.
 
 A peer is never told the name of a share it may not use. An access list that
@@ -307,7 +307,7 @@ Instead:
 locnet share add pg :5432 -on 15432 -allow workstation
 ```
 
-Now `100.100.0.2:15432` reaches it — but only from the tunnel, and only from
+Now `10.99.0.2:15432` reaches it — but only from the tunnel, and only from
 `workstation`. Every accepted connection is checked against the access list
 before anything is dialled. Postgres itself never changes its binding.
 
@@ -322,9 +322,9 @@ machine, so you can tell which one is busy before you send it work — or notice
 that a field unit's disk is filling up before it stops recording.
 
 ```
-PEER     ADDRESS      OS       PATH    CPU        FREE DISK  SERVICES      SHARES
-unit-01  100.100.0.2  windows  direct  34% of 8   210G/931G  rdp,vnc,http  archive
-unit-02   100.100.0.3  windows  relay   91% of 4   18G/465G   rdp,ssh       data,pg
+PEER     ADDRESS    OS       PATH    CPU        FREE DISK  SERVICES      SHARES
+unit-01  10.99.0.2  windows  direct  34% of 8   210G/931G  rdp,vnc,http  archive
+unit-02  10.99.0.3  windows  relay   91% of 4   18G/465G   rdp,ssh       data,pg
 ```
 
 Every field is best-effort and varies by platform. Linux reports everything.

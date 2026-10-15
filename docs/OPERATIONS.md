@@ -249,8 +249,8 @@ appears in nobody's network map until admitted:
 
 ```bash
 locnet-hub nodes
-# NAME     ADDRESS      OS       STATUS   GROUPS  DISK        LAST SEEN
-# unit-01  100.100.0.7  windows  WAITING  -       210G free   just now
+# NAME     ADDRESS    OS       STATUS   GROUPS  DISK        LAST SEEN
+# unit-01  10.99.0.7  windows  WAITING  -       210G free   just now
 
 locnet-hub approve unit-01
 ```
@@ -370,8 +370,8 @@ locnet-hub audit -n 20
 
 ```
 2026-07-31 16:14:05  admin        token.create     "unit-01", 1 use(s)
-2026-07-31 16:15:22  unit-01      node.join        unit-01 (windows) as 100.100.0.7 — awaiting approval
-2026-07-31 16:16:01  admin        node.approve     unit-01 (100.100.0.7)
+2026-07-31 16:15:22  unit-01      node.join        unit-01 (windows) as 10.99.0.7 — awaiting approval
+2026-07-31 16:16:01  admin        node.approve     unit-01 (10.99.0.7)
 2026-07-31 16:20:44  admin        policy.set       3 group(s), 3 rule(s)
 ```
 
@@ -488,7 +488,7 @@ sudo systemctl restart locnet-hub
 Plain HTTP is then refused from every other machine with a message saying to
 upgrade; `/healthz` and requests from the hub machine itself still answer.
 
-`locnet status` on any machine says whether its control plane is encrypted.
+`locnet doctor` on any machine says whether its control plane is encrypted.
 
 ---
 

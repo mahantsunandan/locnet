@@ -43,8 +43,7 @@ start, retrying until it works; a manual `up` or `down` ends those retries, so a
 
 ### `locnet status [-json]`
 
-This machine — name, address, tunnel, hub (and whether the control plane to it
-is encrypted), how the relay sees it — and every
+This machine — name, address, tunnel, hub, how the relay sees it — and every
 peer, with the path (direct or relay), the address it is reached on and the
 latency.
 
@@ -342,7 +341,7 @@ gives GNOME Remote Desktop a login so peers can see the real screen. See
 ### `locnet doctor`
 
 Checks for the usual causes of a network that will not form — daemon, tunnel,
-hub, address conflicts, the path to each peer — and asks a peer the access
+hub (and whether the control plane to it is encrypted), address conflicts, the path to each peer — and asks a peer the access
 policy lets in to connect back and confirm this machine's services are
 reachable. Ports the asking peer is not allowed to reach are marked "not
 checked", not reported as a firewall problem.

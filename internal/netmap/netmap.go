@@ -122,7 +122,7 @@ type Network struct {
 	ID string `json:"id"`
 	// Name is what the operator called this network.
 	Name string `json:"name"`
-	// Prefix is the overlay address range, e.g. 100.100.0.0/16.
+	// Prefix is the overlay address range, e.g. 10.99.0.0/16.
 	Prefix netip.Prefix `json:"prefix"`
 	// Domain is the MagicDNS-style suffix, e.g. "locnet.private".
 	Domain string `json:"domain"`

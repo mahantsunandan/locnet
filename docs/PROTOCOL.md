@@ -170,7 +170,7 @@ Response:
 ```json
 {
   "node_id": "n-x7f2a91b",
-  "ip":      "100.100.0.3",
+  "ip":      "10.99.0.3",
   "name":    "workstation",
   "netmap":  { "payload": "<base64>", "sig": "<base64>", "hub_key": "<base64>" }
 }
@@ -295,7 +295,7 @@ Payload:
   "issued_at": "2026-07-31T16:14:05Z",
   "network": {
     "id": "homelab", "name": "homelab",
-    "prefix": "100.100.0.0/16", "domain": "locnet.private", "mtu": 1280,
+    "prefix": "10.99.0.0/16", "domain": "locnet.private", "mtu": 1280,
     "hubs": ["192.168.1.64:8420", "hub.example.org:8420"], "hub_tls": true
   },
   "self":  { "…": "this node" },
@@ -310,7 +310,7 @@ Each node:
 {
   "id": "n-x7f2a91b", "name": "unit-02", "os": "windows",
   "machine_key": "<base64>", "wg_key": "<base64>", "disco_key": "<base64>",
-  "ip": "100.100.0.3",
+  "ip": "10.99.0.3",
   "endpoints": ["192.168.1.50:41820", "198.51.100.77:41820"],
   "services": [{"name": "rdp", "port": 3389}],
   "shares":   [{"name": "data", "kind": "files", "read_only": true}],
@@ -516,7 +516,7 @@ On Windows every request carries `X-LocNet-Control: <token>`.
 | Plain-HTTP hub retried for TLS after | 10 min |
 | Node WireGuard/disco port | 41820 (UDP) |
 | Node share server port | 8421 (TCP, overlay address only) |
-| Overlay prefix | `100.100.0.0/16` |
+| Overlay prefix | `10.99.0.0/16` |
 | Tunnel MTU | 1280 |
 | WireGuard keepalive | 25 s |
 | Relay re-bind | 20 s |

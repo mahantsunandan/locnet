@@ -32,7 +32,7 @@ const maxUploadSize = 8 << 30 // 8 GiB
 // Authentication is the connection's source address, and that is stronger here
 // than it sounds anywhere else. The listener is bound to the overlay address,
 // so the only way to reach it is through the tunnel, and WireGuard's
-// allowed-IP check means a packet claiming to be from 100.100.0.3 was
+// allowed-IP check means a packet claiming to be from 10.99.0.3 was
 // decrypted with that node's key. There is no token to steal and no password
 // to leak, because the tunnel has already answered the question.
 //

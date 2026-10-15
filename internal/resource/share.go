@@ -10,7 +10,7 @@
 //
 // The authenticator is the overlay source address. That is not the usual weak
 // "trust the source IP" — inside the tunnel, WireGuard's allowed-IP check
-// means a packet from 100.100.0.3 provably came from the holder of that node's
+// means a packet from 10.99.0.3 provably came from the holder of that node's
 // private key. Nothing else can forge it.
 package resource
 

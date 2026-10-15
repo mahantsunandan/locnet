@@ -15,10 +15,10 @@ wireguard-go and the `golang.org/x` crypto, sys, net and text packages.
 
 ```
 $ locnet peers
-PEER     ADDRESS      OS       PATH    CPU        FREE DISK  SERVICES      SHARES
-unit-01  100.100.0.2  windows  direct  34% of 8   210G/931G  rdp,vnc,http  archive
-unit-02  100.100.0.3  windows  relay   91% of 4   18G/465G   rdp,ssh       data,pg
-unit-03  100.100.0.4  windows  direct  12% of 4   301G/465G  vnc           -
+PEER     ADDRESS    OS       PATH    CPU        FREE DISK  SERVICES      SHARES
+unit-01  10.99.0.2  windows  direct  34% of 8   210G/931G  rdp,vnc,http  archive
+unit-02  10.99.0.3  windows  relay   91% of 4   18G/465G   rdp,ssh       data,pg
+unit-03  10.99.0.4  windows  direct  12% of 4   301G/465G  vnc           -
 
 $ locnet ssh unit-01      # a shell, in your own terminal
 $ locnet vnc unit-01      # its screen, in your own viewer
@@ -47,16 +47,16 @@ $ locnet-hub alerts
 ```
 $ locnet status
 network:     homelab (hub.example.org:8420)
-this node:   workstation  100.100.0.1
+this node:   workstation  10.99.0.1
 tunnel:      up  on locnet0  udp/41820
 seen as:     203.0.113.44:41820
 relay:       198.51.100.9:8420
 
-PEER     ADDRESS      OS       PATH    VIA                  LATENCY
-unit-01  100.100.0.2  windows  direct  203.0.113.91:41820   18ms
-unit-02  100.100.0.3  windows  direct  198.51.100.77:41820  24ms
-unit-03  100.100.0.4  windows  direct  198.51.100.78:41820  31ms
-unit-04  100.100.0.5  windows  relay   198.51.100.9:8420    —
+PEER     ADDRESS    OS       PATH    VIA                  LATENCY
+unit-01  10.99.0.2  windows  direct  203.0.113.91:41820   18ms
+unit-02  10.99.0.3  windows  direct  198.51.100.77:41820  24ms
+unit-03  10.99.0.4  windows  direct  198.51.100.78:41820  31ms
+unit-04  10.99.0.5  windows  relay   198.51.100.9:8420    —
 
   direct = peer-to-peer     relay = through the hub     connecting = still probing
 ```
@@ -74,39 +74,329 @@ thousand lines of enterprise features, and here they are not.
 [Nebula]: https://github.com/slackhq/nebula
 [Netmaker]: https://www.netmaker.io
 
-## Quick start
+## Getting started
 
-Build the release for every platform (Go 1.26 or newer, nothing else):
+This takes a new network from nothing to machines that reach each other by
+name, on Linux, macOS and Windows. [docs/INSTALL.md](docs/INSTALL.md) has the
+same steps in more depth.
+
+### What you need
+
+| | |
+|---|---|
+| **One always-on machine for the hub** | Linux with systemd, the recommended choice: the installer sets the hub up as a service there. It needs a fixed LAN address and, if any machine will ever connect from outside your home network, a port forward on your router (step 2). The hub uses little CPU or memory. |
+| **The other machines** | Linux (x86-64, ARM64, ARMv7), macOS (Intel or Apple silicon), Windows 10 or 11 (64-bit). No kernel WireGuard module: LocNet carries its own. |
+| **Administrator rights** | `sudo` on Linux and macOS, an elevated PowerShell on Windows. The agent creates a network interface. |
+| **To build** | [Go](https://go.dev/dl/) 1.26 or newer and `bash`, on any one machine (Linux, macOS, or WSL on Windows). No C compiler. |
+
+The overlay network is `10.99.0.0/16` unless you choose otherwise. Every
+machine keeps the address it is given (`10.99.0.1`, `10.99.0.2`, …) for good.
+
+### 1. Build
 
 ```bash
 git clone https://github.com/mahantsunandan/locnet
 cd locnet
-./scripts/build.sh                       # into dist/locnet_<version>_<os>_<arch>/
+./scripts/build.sh
 ```
 
-Copy the directory for each machine's platform to it, and from inside it, on
-the always-on machine:
+`dist/` now holds one directory per platform, each also as a `.tar.gz`:
+
+| Platform | Directory |
+|---|---|
+| Linux, most PCs | `locnet_<version>_linux_amd64` |
+| Linux, Raspberry Pi 4/5 and other 64-bit ARM | `locnet_<version>_linux_arm64` |
+| Linux, 32-bit ARM | `locnet_<version>_linux_arm` |
+| macOS, Apple silicon | `locnet_<version>_darwin_arm64` |
+| macOS, Intel | `locnet_<version>_darwin_amd64` |
+| Windows, most PCs | `locnet_<version>_windows_amd64` |
+| Windows on ARM | `locnet_<version>_windows_arm64` |
+
+Copy the right one to each machine (`scp`, a USB stick, a shared folder).
+Each holds the three programs, the installer and these documents.
+
+### 2. Set up the hub (Linux)
+
+On the always-on machine, inside its directory:
 
 ```bash
 sudo ./install.sh --hub
-sudo systemctl enable --now locnet-hub
-sudo journalctl -u locnet-hub -n 30      # the first-run join code is printed here
+sudo nano /etc/locnet/hub.env
 ```
 
-On every other machine — one command, and it is on the network:
+Set `LOCNET_ADVERTISE` to the addresses your other machines will use to reach
+this one, most specific first. A hub behind a home router usually lists its LAN
+address and the house's public address, so the same join code works at home
+and away:
+
+```ini
+LOCNET_ADVERTISE=192.168.1.10:8420,203.0.113.7:8420
+LOCNET_LISTEN=:8420
+LOCNET_NETWORK=homelab           # first run only
+LOCNET_PREFIX=10.99.0.0/16       # first run only; change it if your LAN already uses 10.99.x.x
+```
+
+Open port 8420 for TCP and UDP, both, in the hub machine's own firewall:
 
 ```bash
-sudo ./install.sh --join locnet1_jrhacahjfq5r5wgdb63ls2gxd6nx3exn...
+sudo ufw allow 8420/tcp && sudo ufw allow 8420/udp                                         # Ubuntu, Debian
+sudo firewall-cmd --permanent --add-port=8420/tcp --add-port=8420/udp && sudo firewall-cmd --reload   # Fedora, RHEL
 ```
 
-Windows is the same shape:
+#### Port forwarding: reaching the hub from outside your network
+
+If every machine stays on the same home or office network, skip this. If any
+machine will connect from anywhere else, such as a laptop on the road, a
+machine at work or a phone hotspot, it has to reach the hub through your
+router, and the router must forward the port. **Only the hub needs a port
+forward.** The other machines need none: they make outgoing connections, and
+LocNet punches through NAT between them by itself.
+
+1. **Give the hub a fixed LAN address.** In the router's DHCP settings, reserve
+   an address for the hub's network card (often called "DHCP reservation" or
+   "static lease"). A forward that points at an address the hub no longer has
+   breaks silently.
+2. **Forward port 8420, TCP *and* UDP, to that address.** It is usually under
+   "Port forwarding", "Virtual servers" or "NAT" in the router's admin page.
+   Use the same port outside and inside:
+
+   | Protocol | External port | Internal address | Internal port | Used for |
+   |---|---|---|---|---|
+   | TCP | 8420 | the hub's LAN address | 8420 | joining, the network map, administration (encrypted) |
+   | UDP | 8420 | the hub's LAN address | 8420 | the relay, and telling each machine its public address |
+
+   Forgetting UDP is the classic mistake. Machines then join, but every
+   connection between networks stays on `connecting` or `relay`.
+
+   Only if you publish web apps with WebShare, also forward TCP 80 and 443 to
+   the hub ([OPERATIONS.md](docs/OPERATIONS.md#publishing-a-site-to-the-internet-webshare)).
+3. **Find the public address** (what `curl -4 ifconfig.me` prints on the hub)
+   and put it in `LOCNET_ADVERTISE` after the LAN address, as above. If your
+   provider changes it from time to time, use a free dynamic-DNS name instead
+   (DuckDNS, No-IP, or one built into the router), e.g.
+   `LOCNET_ADVERTISE=192.168.1.10:8420,myhome.duckdns.org:8420`. The hub's
+   WebShare feature can keep a DuckDNS name up to date for you.
+4. **Test from outside**, for example from a phone hotspot:
+   `curl -k https://203.0.113.7:8420/healthz` should print `ok`. Testing from
+   inside the house is misleading: most home routers cannot reach their own
+   public address from inside (no "NAT hairpinning"). That is why the code
+   carries the LAN address too, and why the hub's log saying it `could not
+   reach itself` at the public address is normal.
+
+**If there is no public address to forward.** Some providers, especially mobile
+and some fibre or satellite ones, put the house behind carrier-grade NAT. A
+forward then has no effect: the router's WAN address starts with `100.64`–
+`100.127`, or differs from what `ifconfig.me` reports. Ask the provider for a
+public IPv4 address, or run the hub on a machine that has one, such as a small
+cloud server. The hub needs little, holds no tunnel keys, and cannot read
+traffic between machines.
+
+Start it, and read the first join code from its log:
+
+```bash
+sudo systemctl enable --now locnet-hub
+sudo journalctl -u locnet-hub -n 30
+```
+
+```
+hub: network "homelab" on 10.99.0.0/16, advertising 192.168.1.10:8420, 203.0.113.7:8420
+hub: fingerprint e92c3b1ed8c30fb6b968d71f9b7d92ed
+hub: reachable at 192.168.1.10:8420
+ No machines have joined yet, so here is a join code.
+ Good for 10 machines, expires in 24 hours.
+
+   locnet1_qkzgeaaaaaaqbcdefghijklmnopqrstuvwxyz234567…
+```
+
+The hub machine is a member too. Join it with that code:
+
+```bash
+sudo locnet join locnet1_…
+```
+
+Mint more codes whenever you need them:
+
+```bash
+sudo locnet-hub invite -label "office laptop" -uses 1 -ttl 24h
+```
+
+A join code carries the hub's addresses, a fingerprint of the hub's key, and a
+one-time token. A machine refuses any hub whose key does not match the
+fingerprint, and talks to it only over TLS pinned to that key, so the code is
+safe to paste into a chat. Treat it like a password anyway: until it is used up
+or revoked (`sudo locnet-hub revoke <start of code>`), it lets a machine in.
+
+> The hub runs on macOS and Windows too (`./install.sh --hub`,
+> `install.ps1 -Hub`), but there the installer only puts `locnet-hub` in place,
+> with no service. You start `locnet-hub serve -advertise <addresses>` yourself
+> and keep it running.
+
+### 3. Join every other machine
+
+**Linux** (Ubuntu, Debian, Mint, Fedora, RHEL and others):
+
+```bash
+tar xzf locnet_<version>_linux_amd64.tar.gz
+cd locnet_<version>_linux_amd64
+sudo ./install.sh --join locnet1_…
+```
+
+**macOS:**
+
+```bash
+tar xzf locnet_<version>_darwin_arm64.tar.gz      # _darwin_amd64 on Intel
+cd locnet_<version>_darwin_arm64
+sudo ./install.sh --join locnet1_…
+```
+
+The agent runs as a launchd daemon. If macOS asks whether `locnetd` may accept
+incoming connections, allow it.
+
+**Windows 10 / 11:** open PowerShell **as Administrator**, then:
 
 ```powershell
-.\install.ps1 -Join locnet1_jrhacahjfq5r5wgdb63ls2gxd6nx3exn...
+tar -xzf locnet_<version>_windows_amd64.tar.gz
+cd locnet_<version>_windows_amd64
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Join locnet1_…
 ```
 
-Full instructions, including Windows and macOS, are in
-[docs/INSTALL.md](docs/INSTALL.md).
+`-ExecutionPolicy Bypass` applies to this one run only; Windows otherwise
+refuses unsigned scripts. The installer downloads the WireGuard tunnel driver
+(`wintun.dll`) from wintun.net and checks it against a pinned SHA-256. It then
+installs `locnetd` as a Windows service that starts at boot, and marks the
+tunnel as a Private network with one firewall rule for the mesh. See
+[docs/INSTALL.md](docs/INSTALL.md#windows) to install with no download.
+
+On every platform the installer joins as its last step, so the machine is on
+the network when it finishes. On Linux and macOS it also adds you to the
+`locnet` group. Log out and back in once, and `locnet` commands work without
+`sudo`.
+
+### 4. Check it works
+
+```bash
+locnet status        # this machine, the hub, and every peer with its path
+locnet peers         # peers with their services, shares and load
+ping 10.99.0.1       # the hub, through the tunnel
+locnet doctor        # tests each piece — hub, encryption, relay, every peer — and says what to fix
+```
+
+A new peer shows `connecting` for a few seconds while the machines find a path,
+then `direct` (peer to peer) or `relay` (through the hub, when the networks in
+between allow nothing else). `locnet doctor` should say `control plane
+encrypted, pinned to the hub's key`.
+
+To reach peers by name (`ssh office-laptop`, `ping homeserver`):
+
+```bash
+sudo locnet hosts on
+```
+
+### 5. Use it
+
+**Remote access.** `locnet setup` checks what this machine needs in order to be
+reached: an SSH server and a screen-sharing server (VNC, or RDP on Windows).
+With `-install`, it installs only what is missing and shows each command before
+running it:
+
+```bash
+locnet setup                 # what is missing
+sudo locnet setup -install   # install it (an elevated prompt on Windows, without sudo)
+```
+
+Then, from any other machine, these open the client you already have, already
+pointed at the right address:
+
+```bash
+locnet ssh office-laptop     # a shell, in your terminal
+locnet vnc office-laptop     # its screen, in your VNC viewer
+locnet rdp office-laptop     # Windows Remote Desktop
+locnet console               # everything in a browser: machines, files, jobs, admin
+```
+
+**Share a folder or a local service** with named machines (nothing is shared
+until you say who with):
+
+```bash
+locnet share add papers ~/papers -allow office-laptop   # read-only folder
+locnet share add db :5432 -allow office-laptop          # a service bound to 127.0.0.1
+locnet files homeserver papers                          # browse a peer's share
+```
+
+**Run work on other machines**, once they allow it. Only someone at the
+machine can turn this on:
+
+```bash
+sudo locnet compute enable -allow office-laptop -user builder   # on the machine lending its cores
+locnet run homeserver -- make -j8                               # from office-laptop
+locnet queue submit -n 100 -cpus 4 -- ./render.sh               # spread jobs over every free machine
+```
+
+More in [SHARING.md](docs/SHARING.md), [DESKTOP.md](docs/DESKTOP.md),
+[COMPUTE.md](docs/COMPUTE.md) and [QUEUE.md](docs/QUEUE.md). Every command is
+in [COMMANDS.md](docs/COMMANDS.md).
+
+### 6. Lock it down
+
+By default every machine may reach every machine, and any valid code admits a
+machine. Before the network grows:
+
+```bash
+sudo locnet-hub health set -require-approval=true   # new machines wait until you admit them
+sudo locnet-hub approve <machine>
+sudo locnet-hub policy example > policy.json         # groups and who may reach whom
+sudo locnet-hub policy set policy.json
+sudo locnet-hub admins add office-laptop             # administer from that machine, not over SSH to the hub
+```
+
+Once every machine runs 0.10.4 or later, refuse unencrypted connections to the
+hub. Machines that still need upgrading are listed at the end of
+`sudo locnet-hub nodes`:
+
+```bash
+echo 'LOCNET_HUB_FLAGS=-require-tls' | sudo tee -a /etc/locnet/hub.env
+sudo systemctl restart locnet-hub
+```
+
+[OPERATIONS.md](docs/OPERATIONS.md) covers policies, the access table, alerts,
+the audit log, a standby hub, waking machines, and publishing a web app to the
+internet. [SECURITY.md](docs/SECURITY.md) covers what is and is not protected.
+
+### Upgrading
+
+Build the new version and run the same installer again. Use `--hub` on the
+hub, and the elevated `install.ps1` on Windows. Each machine keeps its keys,
+address and membership. Machines and hub can be upgraded in any order.
+
+### Uninstalling
+
+```bash
+sudo ./install.sh --uninstall                                   # Linux, macOS
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Uninstall   # Windows, elevated
+sudo locnet-hub remove <machine>                                # on the hub, to drop it from the network
+```
+
+The machine's state stays behind, so reinstalling rejoins with the same
+address. [INSTALL.md](docs/INSTALL.md#uninstalling) shows how to remove that
+too.
+
+### When something does not work
+
+Run `locnet doctor` on the machine first; it names what is wrong and, usually,
+the command that fixes it. The usual causes:
+
+- **Joining times out.** The machine cannot reach any address in the code.
+  Check the hub's log for `reachable at …`, the firewall (TCP and UDP 8420),
+  and from outside the house, the router's port forward. Many home routers
+  cannot reach their own public address from inside the house, so test the
+  public address from another network.
+- **Peers stay on `relay`.** UDP between the two networks is blocked or
+  heavily NATed. Relayed traffic works, just more slowly. Opening UDP 41820 on
+  either machine usually gives a direct path.
+- **`timestamp is … away from hub time`.** The machine's clock is wrong; turn
+  on network time.
+
+[INSTALL.md](docs/INSTALL.md#troubleshooting) lists the rest.
 
 ## How it works
 
@@ -123,7 +413,7 @@ Full instructions, including Windows and macOS, are in
                     │               │               │
               ┌─────▼────┐    ┌─────▼────┐    ┌─────▼────┐
               │ locnetd  │    │ locnetd  │    │ locnetd  │
-              │ 100.100  │    │ 100.100  │    │ 100.100  │
+              │  10.99   │    │  10.99   │    │  10.99   │
               │   .0.1   │    │   .0.2   │    │   .0.3   │
               └─────┬────┘    └─────┬────┘    └─────┬────┘
                     └────────────────┴───────────────┘

@@ -19,7 +19,7 @@ it ships in (the `VERSION` file).
   working handshake has told them the hub does TLS — never fall back.
   `locnet-hub nodes` and the hub's log name machines still using plain HTTP;
   `locnet-hub serve -require-tls` (on Linux `LOCNET_HUB_FLAGS=-require-tls` in
-  `/etc/locnet/hub.env`) then refuses it. `locnet status` and the console say
+  `/etc/locnet/hub.env`) then refuses it. `locnet doctor` and the console say
   whether a machine's control plane is encrypted.
 - **The standby copies over pinned TLS too.** `locnet-hub serve -follow` pins
   the primary's fingerprint (`-follow-fingerprint`, printed by the new

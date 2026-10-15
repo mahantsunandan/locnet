@@ -157,7 +157,7 @@ that exists, and needs no library.
 
 ### Addresses are the lowest free one
 
-Not random. In a network of a dozen machines, `100.100.0.3` is something you
+Not random. In a network of a dozen machines, `10.99.0.3` is something you
 can remember and write into a firewall rule; a random address in a /16 is not.
 
 Nodes are matched on their identity key at registration, so a machine that
@@ -166,12 +166,12 @@ non-event.
 
 ## The path a packet takes
 
-Sending to `100.100.0.2` from an application:
+Sending to `10.99.0.2` from an application:
 
 1. The kernel routes it to `locnet0`, matching the route for the overlay
    prefix.
 2. wireguard-go reads it from the TUN device, finds the peer whose
-   `allowed_ip` covers `100.100.0.2`, and encrypts it.
+   `allowed_ip` covers `10.99.0.2`, and encrypts it.
 3. It calls `magicsock.Send` with that peer's `peerEndpoint`.
 4. `magicsock` looks up the peer's current path:
    - a direct address confirmed within the last 35 seconds → send there;

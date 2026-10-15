@@ -13,6 +13,7 @@ whether everything else works.
 1. [Before you start](#before-you-start)
 2. [Build the binaries](#1-build-the-binaries)
 3. [Set up the hub](#2-set-up-the-hub)
+   · [Port forwarding](#port-forwarding-reaching-the-hub-from-outside-your-network)
 4. [Add a machine](#3-add-a-machine)
    · [Ubuntu / Debian](#ubuntu--debian) · [Fedora / RHEL](#fedora--rhel)
    · [macOS](#macos) · [Windows](#windows)
@@ -35,7 +36,7 @@ That is the decision that matters:
 
 | Your situation | What to do |
 |---|---|
-| The hub has a public IP, or you can forward ports to it | Forward **TCP and UDP port 8420**. Advertise the public address. Best case: the relay works for everyone and hole punching has a reliable rendezvous. |
+| The hub has a public IP, or you can forward ports to it | Forward **TCP and UDP port 8420** ([how](#port-forwarding-reaching-the-hub-from-outside-your-network)). Advertise the LAN and the public address. Best case: the relay works for everyone and hole punching has a reliable rendezvous. |
 | Everything is on one LAN already | Advertise the hub's LAN address. Nothing to forward. |
 | The hub is behind NAT you cannot control | Put the hub on a cheap VPS instead and let the always-on machine at home be an ordinary member. A hub nobody can reach coordinates nobody. |
 
@@ -63,10 +64,11 @@ the installer runs it under its own unprivileged user.
 
 ## 1. Build the binaries
 
-Go 1.24 or newer. No C compiler, no libraries.
+Go 1.26 or newer and `bash` (Linux, macOS, or WSL on Windows). No C compiler,
+no libraries.
 
 ```bash
-git clone <your-repo-url> locnet
+git clone https://github.com/mahantsunandan/locnet
 cd locnet
 go test ./...
 ./scripts/build.sh
@@ -82,8 +84,8 @@ go test ./...
 On the always-on machine (Linux example):
 
 ```bash
-tar xzf locnet_0.2.0_linux_amd64.tar.gz
-cd locnet_0.2.0_linux_amd64
+tar xzf locnet_<version>_linux_amd64.tar.gz
+cd locnet_<version>_linux_amd64
 sudo ./install.sh --hub
 sudo nano /etc/locnet/hub.env
 ```
@@ -107,7 +109,7 @@ sudo journalctl -u locnet-hub -n 30
 The log ends with your first join code:
 
 ```
-16:14:05 hub: network "homelab" on 100.100.0.0/16, advertising hub.example.org:8420
+16:14:05 hub: network "homelab" on 10.99.0.0/16, advertising hub.example.org:8420
 16:14:05 hub: fingerprint e92c3b1ed8c30fb6b968d71f9b7d92ed
 
 ────────────────────────────────────────────────────────────────
@@ -133,6 +135,54 @@ sudo ufw allow 8420/tcp && sudo ufw allow 8420/udp          # Ubuntu/Debian
 sudo firewall-cmd --permanent --add-port=8420/tcp --add-port=8420/udp && sudo firewall-cmd --reload
 ```
 
+### Port forwarding: reaching the hub from outside your network
+
+If every machine stays on the same home or office network, skip this. If any
+machine will connect from anywhere else, such as a laptop on the road, a
+machine at work or a phone hotspot, it has to reach the hub through your
+router, and the router must forward the port. **Only the hub needs a port
+forward.** The other machines need none: they make outgoing connections, and
+LocNet punches through NAT between them by itself.
+
+1. **Give the hub a fixed LAN address.** In the router's DHCP settings, reserve
+   an address for the hub's network card (often called "DHCP reservation" or
+   "static lease"). A forward that points at an address the hub no longer has
+   breaks silently.
+2. **Forward port 8420, TCP *and* UDP, to that address.** It is usually under
+   "Port forwarding", "Virtual servers" or "NAT" in the router's admin page.
+   Use the same port outside and inside:
+
+   | Protocol | External port | Internal address | Internal port | Used for |
+   |---|---|---|---|---|
+   | TCP | 8420 | the hub's LAN address | 8420 | joining, the network map, administration (encrypted) |
+   | UDP | 8420 | the hub's LAN address | 8420 | the relay, and telling each machine its public address |
+
+   Forgetting UDP is the classic mistake. Machines then join, but every
+   connection between networks stays on `connecting` or `relay`.
+
+   Only if you publish web apps with WebShare, also forward TCP 80 and 443 to
+   the hub ([OPERATIONS.md](OPERATIONS.md#publishing-a-site-to-the-internet-webshare)).
+3. **Find the public address** (what `curl -4 ifconfig.me` prints on the hub)
+   and put it in `LOCNET_ADVERTISE` after the LAN address. If your
+   provider changes it from time to time, use a free dynamic-DNS name instead
+   (DuckDNS, No-IP, or one built into the router), e.g.
+   `LOCNET_ADVERTISE=192.168.1.10:8420,myhome.duckdns.org:8420`. The hub's
+   WebShare feature can keep a DuckDNS name up to date for you.
+4. **Test from outside**, for example from a phone hotspot:
+   `curl -k https://203.0.113.7:8420/healthz` should print `ok`. Testing from
+   inside the house is misleading: most home routers cannot reach their own
+   public address from inside (no "NAT hairpinning"). That is why the code
+   carries the LAN address too, and why the hub's log saying it `could not
+   reach itself` at the public address is normal.
+
+**If there is no public address to forward.** Some providers, especially mobile
+and some fibre or satellite ones, put the house behind carrier-grade NAT. A
+forward then has no effect: the router's WAN address starts with `100.64`–
+`100.127`, or differs from what `ifconfig.me` reports. Ask the provider for a
+public IPv4 address, or run the hub on a machine that has one, such as a small
+cloud server. The hub needs little, holds no tunnel keys, and cannot read
+traffic between machines.
+
 ---
 
 ## 3. Add a machine
@@ -152,8 +202,8 @@ or revoked.
 ### Ubuntu / Debian
 
 ```bash
-tar xzf locnet_0.2.0_linux_amd64.tar.gz
-cd locnet_0.2.0_linux_amd64
+tar xzf locnet_<version>_linux_amd64.tar.gz
+cd locnet_<version>_linux_amd64
 sudo ./install.sh
 sudo locnet join locnet1_…
 ```
@@ -166,8 +216,8 @@ implementation built in. Works on Ubuntu, Debian, Mint and Pop!_OS.
 Identical, and the installer picks the right package manager:
 
 ```bash
-tar xzf locnet_0.2.0_linux_amd64.tar.gz
-cd locnet_0.2.0_linux_amd64
+tar xzf locnet_<version>_linux_amd64.tar.gz
+cd locnet_<version>_linux_amd64
 sudo ./install.sh
 sudo locnet join locnet1_…
 ```
@@ -178,8 +228,8 @@ If SELinux is enforcing and `locnetd` cannot create the interface, check
 ### macOS
 
 ```bash
-tar xzf locnet_0.2.0_darwin_arm64.tar.gz    # or _amd64 on Intel
-cd locnet_0.2.0_darwin_arm64
+tar xzf locnet_<version>_darwin_arm64.tar.gz    # or _amd64 on Intel
+cd locnet_<version>_darwin_arm64
 sudo ./install.sh
 sudo locnet join locnet1_…
 ```
@@ -193,13 +243,17 @@ cannot tell the machine its public address.
 Windows 10 or later, 64-bit. Windows 7 and 8 are not supported and the
 installer stops rather than leaving you with a service that cannot start.
 
-From an **elevated** PowerShell prompt:
+From an **elevated** PowerShell prompt (Run as Administrator):
 
 ```powershell
-Expand-Archive locnet_0.2.0_windows_amd64.zip
-cd locnet_0.2.0_windows_amd64
-.\install.ps1 -Join locnet1_…
+tar -xzf locnet_<version>_windows_amd64.tar.gz
+cd locnet_<version>_windows_amd64
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Join locnet1_…
 ```
+
+`tar` ships with Windows 10 and 11. `-ExecutionPolicy Bypass` lets this one
+unsigned script run without changing the machine's policy; a plain
+`.\install.ps1` is refused on a default Windows install.
 
 That is the whole install: one command leaves the machine on the mesh.
 
@@ -375,9 +429,9 @@ locnet console     # the web console
 ```
 
 ```
-PEER     ADDRESS      OS       PATH    CPU        FREE DISK  SERVICES      SHARES
-unit-01  100.100.0.2  windows  direct  34% of 8   210G/931G  rdp,vnc,http  archive
-unit-02   100.100.0.3  windows  relay   91% of 4   18G/465G   rdp,ssh       data,pg
+PEER     ADDRESS    OS       PATH    CPU        FREE DISK  SERVICES      SHARES
+unit-01  10.99.0.2  windows  direct  34% of 8   210G/931G  rdp,vnc,http  archive
+unit-02  10.99.0.3  windows  relay   91% of 4   18G/465G   rdp,ssh       data,pg
 ```
 
 `connecting` for a few seconds after a machine joins is normal — that is the
@@ -387,7 +441,7 @@ infrequent.
 Then use it:
 
 ```bash
-ping 100.100.0.2
+ping 10.99.0.2
 locnet rdp unit-01
 locnet ssh unit-02
 ```
