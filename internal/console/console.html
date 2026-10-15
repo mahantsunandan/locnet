@@ -1,0 +1,2388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LocNet Console</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f5f8b'/%3E%3Ccircle cx='10' cy='11' r='3.2' fill='white'/%3E%3Ccircle cx='22' cy='11' r='3.2' fill='white'/%3E%3Ccircle cx='16' cy='22' r='3.2' fill='white'/%3E%3Cpath d='M10 11L22 11L16 22Z' fill='none' stroke='white' stroke-width='1.8'/%3E%3C/svg%3E">
+<script>
+  /* Theme before first paint, so a reload never flashes the wrong one. With no
+     choice saved, the page follows the system. */
+  try {
+    var t = localStorage.getItem("locnet-theme");
+    if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+  } catch (e) {}
+</script>
+<style>
+/* Every colour is a variable, so the dark theme only redefines them. Dark is
+   used when the system asks for it and nothing else was chosen, or when it was
+   chosen here. */
+:root {
+  color-scheme: light;
+  --bg:#f5f4f1; --bg-deep:#ebe9e5; --surface:#ffffff; --alt:#faf9f7;
+  --quiet:#f2f0ed; --hover:#efede9; --border:#e3e0db; --border-in:#eeebe7;
+  --text:#1c1a17; --muted:#57534e; --faint:#9c968e;
+  --accent:#1f5f8b; --accent-hi:#26719f; --accent-bg:#e8f0f7; --accent-br:#c5dced; --on-accent:#ffffff;
+  --ok:#3f7a2a;  --ok-bg:#edf4e7;  --ok-br:#d4e5c6;
+  --warn:#8f5714; --warn-bg:#fcf1dd; --warn-br:#efdab2;
+  --err:#b2382a;  --err-bg:#fcebe7; --err-br:#f2cfc8;
+  --nav:#f0eee9; --nav-hi:#e6e3dd;
+  --term:#1b1b1f; --term-text:#e7e6ec; --term-faint:#85838e;
+  --shadow-sm:0 1px 2px rgba(40,30,20,.06);
+  --shadow:0 1px 3px rgba(40,30,20,.06), 0 12px 28px -14px rgba(40,30,20,.22);
+  --shadow-lg:0 2px 6px rgba(40,30,20,.08), 0 24px 60px -18px rgba(40,30,20,.35);
+  --radius:12px; --radius-sm:8px;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Mono","DejaVu Sans Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg:#121215; --bg-deep:#1a1a1e; --surface:#1b1b1f; --alt:#1f1f24;
+    --quiet:#25252b; --hover:#2a2a31; --border:#303037; --border-in:#28282e;
+    --text:#ecebf0; --muted:#a6a4ae; --faint:#6d6b76;
+    --accent:#5ea9dd; --accent-hi:#7cbbe8; --accent-bg:#13232f; --accent-br:#21435a; --on-accent:#08131b;
+    --ok:#7fc06a;  --ok-bg:#172416;  --ok-br:#2b4026;
+    --warn:#e0a948; --warn-bg:#2a2113; --warn-br:#46391e;
+    --err:#ef7f70;  --err-bg:#2d1916; --err-br:#4c2924;
+    --nav:#16161a; --nav-hi:#222228;
+    --term:#0e0e11; --term-text:#e7e6ec; --term-faint:#6f6d78;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+    --shadow:0 1px 3px rgba(0,0,0,.4), 0 12px 28px -14px rgba(0,0,0,.75);
+    --shadow-lg:0 2px 6px rgba(0,0,0,.5), 0 24px 60px -18px rgba(0,0,0,.85);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#121215; --bg-deep:#1a1a1e; --surface:#1b1b1f; --alt:#1f1f24;
+  --quiet:#25252b; --hover:#2a2a31; --border:#303037; --border-in:#28282e;
+  --text:#ecebf0; --muted:#a6a4ae; --faint:#6d6b76;
+  --accent:#5ea9dd; --accent-hi:#7cbbe8; --accent-bg:#13232f; --accent-br:#21435a; --on-accent:#08131b;
+  --ok:#7fc06a;  --ok-bg:#172416;  --ok-br:#2b4026;
+  --warn:#e0a948; --warn-bg:#2a2113; --warn-br:#46391e;
+  --err:#ef7f70;  --err-bg:#2d1916; --err-br:#4c2924;
+  --nav:#16161a; --nav-hi:#222228;
+  --term:#0e0e11; --term-text:#e7e6ec; --term-faint:#6f6d78;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+  --shadow:0 1px 3px rgba(0,0,0,.4), 0 12px 28px -14px rgba(0,0,0,.75);
+  --shadow-lg:0 2px 6px rgba(0,0,0,.5), 0 24px 60px -18px rgba(0,0,0,.85);
+}
+
+*{box-sizing:border-box;}
+/* An inline icon with no size of its own would be drawn at the browser's
+   default of 300 by 150. Every icon gets a sensible one; the places that
+   want another say so below. */
+svg:not([width]){width:16px; height:16px; flex:none;}
+html,body{height:100%;}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font:14px/1.45 system-ui,-apple-system,"Segoe UI",Inter,Roboto,"Helvetica Neue",sans-serif;
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+}
+button,input,select,textarea{font:inherit; color:inherit;}
+a{color:var(--accent);}
+[hidden]{display:none !important;}
+.mono{font-family:var(--mono); font-size:12.5px;}
+.muted{color:var(--muted);} .faint{color:var(--faint);}
+.num{font-variant-numeric:tabular-nums;}
+
+/* ----------------------------------------------------------------- shell */
+.app{display:grid; grid-template-columns:232px 1fr; height:100vh;}
+.nav{background:var(--nav); border-right:1px solid var(--border); display:flex;
+  flex-direction:column; padding:16px 12px 12px; gap:4px; min-height:0;}
+.brand{display:flex; align-items:center; gap:10px; padding:2px 8px 14px;}
+.brand-mark{width:30px; height:30px; border-radius:9px; background:var(--accent);
+  display:grid; place-items:center; flex:none; box-shadow:var(--shadow-sm);}
+.brand-mark svg{width:20px; height:20px;}
+.brand-text{min-width:0;}
+.brand-name{font-weight:700; font-size:15px; letter-spacing:-.01em;}
+.brand-net{font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.navlink{display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px;
+  color:var(--muted); text-decoration:none; font-weight:520; font-size:13.5px; cursor:pointer;
+  border:0; background:transparent; width:100%; text-align:left; transition:background .12s,color .12s;}
+.navlink:hover{background:var(--nav-hi); color:var(--text);}
+.navlink[aria-current="page"]{background:var(--surface); color:var(--text); box-shadow:var(--shadow-sm);}
+.navlink svg{width:17px; height:17px; flex:none;}
+.navlink .count{margin-left:auto; font-size:11.5px; font-weight:600; color:var(--faint);
+  font-variant-numeric:tabular-nums;}
+.navlink .count.hot{color:var(--accent);}
+.navlink .lock{margin-left:auto; color:var(--faint); width:13px; height:13px;}
+.nav-sep{height:1px; background:var(--border); margin:8px 6px;}
+.nav-foot{margin-top:auto; display:flex; flex-direction:column; gap:8px;}
+.healthcard{display:flex; align-items:center; gap:10px; padding:10px 11px; border-radius:10px;
+  background:var(--surface); border:1px solid var(--border); cursor:pointer; text-align:left; width:100%;}
+.healthcard:hover{border-color:var(--accent-br);}
+.hdot{width:9px; height:9px; border-radius:50%; background:var(--faint); flex:none;}
+.hdot.ok{background:var(--ok); box-shadow:0 0 0 3px var(--ok-bg);}
+.hdot.warn{background:var(--warn); box-shadow:0 0 0 3px var(--warn-bg);}
+.hdot.bad{background:var(--err); box-shadow:0 0 0 3px var(--err-bg);}
+.healthcard b{display:block; font-size:12.5px; font-weight:600;}
+.healthcard span{display:block; font-size:11.5px; color:var(--muted);}
+.nav-tools{display:flex; align-items:center; gap:6px; padding:0 2px;}
+.nav-tools .ver{margin-left:auto; font-size:11px; color:var(--faint);}
+
+.main{display:flex; flex-direction:column; min-width:0; min-height:0;}
+.topbar{display:flex; align-items:center; gap:12px; padding:16px 24px 12px; min-height:64px;}
+.topbar h1{margin:0; font-size:19px; font-weight:680; letter-spacing:-.015em;}
+.topbar .sub{font-size:12.5px; color:var(--muted); margin-top:1px;}
+.topbar-right{margin-left:auto; display:flex; align-items:center; gap:8px;}
+.live{display:inline-flex; align-items:center; gap:7px; font-size:12px; color:var(--muted);
+  padding:5px 10px; border-radius:999px; border:1px solid var(--border); background:var(--surface);
+  cursor:pointer; user-select:none;}
+.live i{width:7px; height:7px; border-radius:50%; background:var(--ok);}
+.live.on i{animation:pulse 2.4s ease-in-out infinite;}
+.live.off i{background:var(--faint);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.content{flex:1; overflow:auto; padding:4px 24px 24px; min-height:0;}
+.page{display:flex; flex-direction:column; gap:16px; max-width:1500px;}
+
+/* ------------------------------------------------------------- controls */
+.btn{appearance:none; display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  font-size:13px; font-weight:540; color:var(--text); background:var(--surface);
+  border:1px solid var(--border); border-radius:var(--radius-sm); padding:6px 12px; cursor:pointer;
+  white-space:nowrap; box-shadow:var(--shadow-sm); transition:background .12s,border-color .12s,transform .06s;
+  min-height:32px;}
+.btn:hover:not([disabled]){background:var(--hover);}
+.btn:active:not([disabled]){transform:translateY(1px);}
+.btn[disabled]{opacity:.45; cursor:not-allowed;}
+.btn svg{width:15px; height:15px; flex:none;}
+.btn-primary{background:var(--accent); border-color:var(--accent); color:var(--on-accent);}
+.btn-primary:hover:not([disabled]){background:var(--accent-hi); border-color:var(--accent-hi);}
+.btn-danger{color:var(--err); border-color:var(--err-br); background:var(--surface);}
+.btn-warn{color:var(--warn); border-color:var(--warn-br); background:var(--warn-bg);}
+.btn-warn:hover:not([disabled]){background:var(--warn-bg); filter:brightness(.97);}
+.btn-danger:hover:not([disabled]){background:var(--err-bg);}
+.btn-danger.solid{background:var(--err); border-color:var(--err); color:#fff;}
+.btn-ghost{background:transparent; border-color:transparent; box-shadow:none; color:var(--muted);}
+.btn-ghost:hover:not([disabled]){background:var(--hover); color:var(--text);}
+.btn-sm{font-size:12px; padding:3px 9px; min-height:26px; border-radius:7px;}
+.btn-block{width:100%;}
+.iconbtn{width:32px; height:32px; padding:0; display:inline-grid; place-items:center; flex:none;
+  border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--muted);
+  cursor:pointer; box-shadow:var(--shadow-sm);}
+.iconbtn:hover{background:var(--hover); color:var(--text);}
+.iconbtn svg{width:16px; height:16px;}
+.iconbtn.bare{border-color:transparent; background:transparent; box-shadow:none;}
+.badge-dot{position:relative;}
+.badge-dot[data-n]:not([data-n="0"])::after{content:attr(data-n); position:absolute; top:-5px; right:-5px;
+  min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:var(--accent); color:var(--on-accent);
+  font-size:10px; font-weight:700; display:grid; place-items:center; line-height:1;}
+
+input[type="text"],input[type="search"],input[type="number"],select,textarea{
+  font-size:13px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm);
+  padding:6px 10px; min-height:32px; box-shadow:var(--shadow-sm); width:100%;}
+textarea{resize:vertical; font-family:var(--mono); font-size:12.5px; line-height:1.5;}
+input:focus,select:focus,textarea:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-bg);}
+input::placeholder,textarea::placeholder{color:var(--faint);}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none;}
+label.field{display:flex; flex-direction:column; gap:5px; font-size:12px; font-weight:560; color:var(--muted);}
+label.field .hint{font-weight:400; color:var(--faint);}
+label.field input,label.field select,label.field textarea{font-weight:400; color:var(--text);}
+.check{display:inline-flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; user-select:none;}
+.check input{width:15px; height:15px; accent-color:var(--accent); margin:0;}
+.searchbox{position:relative; width:240px;}
+.searchbox svg{position:absolute; left:9px; top:50%; width:15px; height:15px; transform:translateY(-50%); color:var(--faint);}
+.searchbox input{padding-left:30px;}
+.searchbox kbd{position:absolute; right:7px; top:50%; transform:translateY(-50%);}
+kbd{font-family:var(--mono); font-size:10.5px; padding:1px 5px; border-radius:4px;
+  border:1px solid var(--border); background:var(--alt); color:var(--faint);}
+
+.switch{display:inline-flex; align-items:center; gap:10px; cursor:pointer; user-select:none; font-size:13px;}
+.switch input{position:absolute; opacity:0; pointer-events:none;}
+.switch .track{width:36px; height:21px; border-radius:999px; background:var(--bg-deep); border:1px solid var(--border);
+  position:relative; transition:background .16s,border-color .16s; flex:none;}
+.switch .track::after{content:""; position:absolute; top:2px; left:2px; width:15px; height:15px; border-radius:50%;
+  background:var(--surface); box-shadow:var(--shadow-sm); transition:transform .16s;}
+.switch input:checked + .track{background:var(--accent); border-color:var(--accent);}
+.switch input:checked + .track::after{transform:translateX(15px);}
+.switch input:focus-visible + .track{outline:2px solid var(--accent); outline-offset:2px;}
+
+.seg{display:inline-flex; background:var(--quiet); border:1px solid var(--border); border-radius:9px; padding:2px; gap:2px;}
+.seg button{appearance:none; border:0; background:transparent; color:var(--muted); font-size:12.5px; font-weight:560;
+  padding:4px 11px; border-radius:7px; cursor:pointer;}
+.seg button:hover{color:var(--text);}
+.seg button[aria-pressed="true"]{background:var(--surface); color:var(--text); box-shadow:var(--shadow-sm);}
+
+/* ---------------------------------------------------------------- cards */
+.card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow);}
+.card-h{display:flex; align-items:center; gap:10px; padding:13px 16px; border-bottom:1px solid var(--border-in);}
+.card-h h2{margin:0; font-size:14px; font-weight:650;}
+.card-h .sub{font-size:12px; color:var(--muted);}
+.card-h .right{margin-left:auto; display:flex; gap:8px; align-items:center;}
+.card-b{padding:14px 16px;}
+.card-b.tight{padding:0;}
+.grid2{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px;}
+.grid3{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px;}
+.stack{display:flex; flex-direction:column; gap:12px;}
+.row{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+.row.end{justify-content:flex-end;}
+.spacer{flex:1;}
+
+.kpis{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px;}
+.kpi{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px 15px;
+  box-shadow:var(--shadow-sm); min-width:0;}
+.kpi .k{font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; color:var(--faint);}
+.kpi .v{font-size:21px; font-weight:680; letter-spacing:-.02em; margin-top:2px; font-variant-numeric:tabular-nums;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.kpi .v small{font-size:13px; font-weight:500; color:var(--muted); letter-spacing:0;}
+.kpi .d{font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.kpi.good .v{color:var(--ok);} .kpi.warn .v{color:var(--warn);} .kpi.bad .v{color:var(--err);}
+
+/* ---------------------------------------------------------------- pills */
+.pill{display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:600; white-space:nowrap;
+  border-radius:999px; padding:2px 9px 2px 7px; border:1px solid transparent; line-height:1.5;}
+.pill::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor; flex:none;}
+.pill.ok{color:var(--ok); background:var(--ok-bg); border-color:var(--ok-br);}
+.pill.warn{color:var(--warn); background:var(--warn-bg); border-color:var(--warn-br);}
+.pill.bad{color:var(--err); background:var(--err-bg); border-color:var(--err-br);}
+.pill.idle{color:var(--muted); background:var(--bg-deep); border-color:var(--border);}
+.pill.info{color:var(--accent); background:var(--accent-bg); border-color:var(--accent-br);}
+.tag{display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:560; color:var(--muted);
+  background:var(--bg-deep); border:1px solid var(--border); border-radius:6px; padding:0 6px; line-height:18px;
+  white-space:nowrap;}
+.tag.accent{color:var(--accent); background:var(--accent-bg); border-color:var(--accent-br);}
+.tag.ok{color:var(--ok); background:var(--ok-bg); border-color:var(--ok-br);}
+.tag.warn{color:var(--warn); background:var(--warn-bg); border-color:var(--warn-br);}
+.tags{display:flex; gap:4px; flex-wrap:wrap;}
+
+/* -------------------------------------------------------------- alerts */
+.notice{display:flex; gap:12px; align-items:flex-start; padding:11px 14px; border-radius:10px; border:1px solid;
+  font-size:13px;}
+.notice svg{width:17px; height:17px; flex:none; margin-top:1px;}
+.notice.warn{background:var(--warn-bg); border-color:var(--warn-br); color:var(--warn);}
+.notice.bad{background:var(--err-bg); border-color:var(--err-br); color:var(--err);}
+.notice.info{background:var(--accent-bg); border-color:var(--accent-br); color:var(--accent);}
+.notice .body{color:var(--text); flex:1; min-width:0;}
+.notice .body b{font-weight:640;}
+.notice ul{margin:4px 0 0; padding-left:18px;}
+.notice li{margin:2px 0;}
+
+/* --------------------------------------------------------------- table */
+.tablewrap{overflow:auto;}
+table.grid{border-collapse:separate; border-spacing:0; width:100%; font-size:13px;}
+table.grid th{position:sticky; top:0; z-index:1; background:var(--alt); color:var(--faint); font-size:10.5px;
+  font-weight:700; letter-spacing:.06em; text-transform:uppercase; text-align:left; white-space:nowrap;
+  padding:9px 12px; border-bottom:1px solid var(--border); user-select:none;}
+table.grid th.sortable{cursor:pointer;}
+table.grid th.sortable:hover{color:var(--muted);}
+table.grid th.sorted{color:var(--accent);}
+table.grid th .arrow{font-size:9px; margin-left:3px;}
+table.grid td{padding:8px 12px; border-bottom:1px solid var(--border-in); vertical-align:middle;
+  font-variant-numeric:tabular-nums;}
+table.grid tr:last-child td{border-bottom:0;}
+table.acc th.from, table.acc td.from{font-weight:600; color:var(--text); white-space:nowrap;}
+table.acc td.cell{white-space:nowrap;}
+table.acc button.pill{cursor:pointer; font:inherit; font-size:11.5px; font-weight:600;}
+table.acc button.pill:hover{filter:brightness(1.08); text-decoration:underline;}
+table.acc button.pill:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+table.grid tbody tr{transition:background .1s;}
+table.grid.clickable tbody tr{cursor:pointer;}
+table.grid tbody tr:hover{background:var(--hover);}
+table.grid tbody tr.active{background:var(--accent-bg);}
+table.grid tbody tr.active td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
+table.grid tbody tr.dim td{color:var(--faint);}
+table.grid td.c-check, table.grid th.c-check{width:36px; padding-right:0;}
+table.grid td.r, table.grid th.r{text-align:right;}
+.mname{display:flex; align-items:center; gap:10px; min-width:0;}
+.mname .os{width:30px; height:30px; border-radius:8px; background:var(--bg-deep); border:1px solid var(--border);
+  display:grid; place-items:center; flex:none; color:var(--muted);}
+.mname .os svg{width:16px; height:16px;}
+.mname .os.on{color:var(--accent); background:var(--accent-bg); border-color:var(--accent-br);}
+.mname b{font-weight:620; display:flex; gap:6px; align-items:center; white-space:nowrap;}
+.mname small{display:block; font-size:12px; color:var(--muted); white-space:nowrap;}
+.meter{display:flex; align-items:center; gap:8px; min-width:118px; font-size:12px; color:var(--muted); white-space:nowrap;}
+.meter .bar{width:56px; height:6px; border-radius:99px; background:var(--bg-deep); overflow:hidden; flex:none;}
+.meter .bar i{display:block; height:100%; background:var(--accent); border-radius:99px;}
+.meter .bar i.warn{background:var(--warn);} .meter .bar i.bad{background:var(--err);}
+.empty{padding:34px 16px; text-align:center; color:var(--muted); font-size:13px;}
+.empty b{display:block; color:var(--text); font-size:14px; margin-bottom:4px;}
+
+.toolbar{display:flex; align-items:center; gap:10px; padding:10px 12px; border-bottom:1px solid var(--border-in);}
+.bulkbar{display:flex; align-items:center; gap:8px; padding:9px 12px; border-top:1px solid var(--border);
+  background:var(--accent-bg); border-radius:0 0 var(--radius) var(--radius); flex-wrap:wrap;}
+.bulkbar b{color:var(--accent); font-size:13px; margin-right:4px;}
+
+/* -------------------------------------------------------------- drawer */
+.scrim{position:fixed; inset:0; background:rgba(20,16,12,.28); z-index:30; opacity:0; pointer-events:none;
+  transition:opacity .18s;}
+.scrim.on{opacity:1; pointer-events:auto;}
+.drawer{position:fixed; top:0; right:0; bottom:0; width:min(420px,100vw); background:var(--surface);
+  border-left:1px solid var(--border); box-shadow:var(--shadow-lg); z-index:31; transform:translateX(102%);
+  transition:transform .2s ease; display:flex; flex-direction:column;}
+.drawer.on{transform:none;}
+.drawer-h{display:flex; align-items:flex-start; gap:12px; padding:18px 18px 14px; border-bottom:1px solid var(--border-in);}
+.drawer-h h2{margin:0; font-size:18px; font-weight:680; letter-spacing:-.01em; display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+.drawer-h .sub{font-size:12.5px; color:var(--muted); margin-top:3px;}
+.drawer-b{flex:1; overflow:auto; padding:16px 18px 24px; display:flex; flex-direction:column; gap:18px;}
+.sect h3{margin:0 0 8px; font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--faint);}
+.actions{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;}
+.actions .btn{justify-content:flex-start;}
+.actions .wide{grid-column:1/-1;}
+.kv{display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:13px; margin:0;}
+.kv dt{color:var(--muted);} .kv dd{margin:0; min-width:0; overflow-wrap:anywhere;}
+.res{display:flex; flex-direction:column; gap:10px;}
+.res-row{display:grid; grid-template-columns:70px 1fr auto; gap:10px; align-items:center; font-size:12.5px;}
+.res-row .lbl{color:var(--muted);}
+.res-row .bar{height:7px; border-radius:99px; background:var(--bg-deep); overflow:hidden;}
+.res-row .bar i{display:block; height:100%; background:var(--accent);}
+.res-row .bar i.warn{background:var(--warn);} .res-row .bar i.bad{background:var(--err);}
+.res-row .val{font-variant-numeric:tabular-nums; color:var(--muted); white-space:nowrap;}
+.list{display:flex; flex-direction:column; border:1px solid var(--border); border-radius:10px; overflow:hidden;}
+.list .li{display:flex; align-items:center; gap:10px; padding:8px 12px; font-size:13px; border-bottom:1px solid var(--border-in);}
+.list .li:last-child{border-bottom:0;}
+.list .li .grow{flex:1; min-width:0;}
+.list .li > svg{color:var(--muted);}
+.drawer .list .li small{white-space:normal;}
+.list .li small{display:block; color:var(--muted); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.list .li.click{cursor:pointer;} .list .li.click:hover{background:var(--hover);}
+.copyable{cursor:pointer; border-bottom:1px dashed transparent;}
+.copyable:hover{border-bottom-color:var(--faint);}
+
+/* ------------------------------------------------------------ terminal */
+.term{background:var(--term); color:var(--term-text); border-radius:10px; font:12.5px/1.55 var(--mono);
+  padding:12px 14px; overflow:auto; white-space:pre-wrap; word-break:break-word; min-height:120px;}
+.term .ln{padding:0;}
+.term .t{color:var(--term-faint);}
+.term .h{color:#8cc5ee; font-weight:600;}
+.term .e{color:#f29384;}
+.term .g{color:#9bd388;}
+.term .p{color:#e8c06f;}
+.term .tgt{color:#c5a6f0;}
+.term .empty{color:var(--term-faint); padding:0; text-align:left;}
+.sheet{position:fixed; left:232px; right:0; bottom:0; height:min(46vh,420px); background:var(--surface);
+  border-top:1px solid var(--border); box-shadow:var(--shadow-lg); z-index:25; transform:translateY(102%);
+  transition:transform .2s ease; display:flex; flex-direction:column;}
+.sheet.on{transform:none;}
+.sheet-h{display:flex; align-items:center; gap:10px; padding:10px 18px; border-bottom:1px solid var(--border-in);}
+.sheet-h h2{margin:0; font-size:14px;}
+.sheet-b{flex:1; min-height:0; padding:12px 18px 16px; display:flex;}
+.sheet-b .term{flex:1;}
+.progress{height:6px; border-radius:999px; background:var(--bg-deep); overflow:hidden;}
+.progress i{display:block; height:100%; width:0; background:var(--accent); transition:width .25s;}
+
+/* --------------------------------------------------------------- files */
+.fm{display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); height:calc(100vh - 330px); min-height:360px;}
+.fm-pane{display:flex; flex-direction:column; min-width:0; min-height:0;}
+.fm-bar{display:flex; align-items:center; gap:6px; padding:9px 10px; border-bottom:1px solid var(--border-in); background:var(--alt);}
+.fm-bar .who{font-size:12px; font-weight:650; color:var(--muted); white-space:nowrap; padding:0 4px;}
+.fm-bar select{width:auto; max-width:170px;}
+.fm-bar input{font-family:var(--mono); font-size:12px;}
+.fm-list{flex:1; overflow:auto; min-height:0;}
+.fm-row{display:grid; grid-template-columns:20px minmax(0,1fr) 80px 92px; gap:8px; align-items:center; padding:5px 12px;
+  font-size:13px; cursor:pointer; border-bottom:1px solid var(--border-in); user-select:none;}
+.fm-row:hover{background:var(--hover);}
+.fm-row.on{background:var(--accent-bg); color:var(--accent);}
+.fm-row .ic{color:var(--faint); display:grid; place-items:center;}
+.fm-row .ic svg{width:15px; height:15px;}
+.fm-row.dir .ic{color:var(--accent);}
+.fm-row .nm{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.fm-row .sz,.fm-row .dt{color:var(--faint); font-size:12px; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums;}
+.fm-mid{display:flex; flex-direction:column; justify-content:center; gap:10px; padding:0 12px;
+  border-left:1px solid var(--border-in); border-right:1px solid var(--border-in); background:var(--alt);}
+.fm-foot{padding:10px 14px; border-top:1px solid var(--border-in); display:flex; flex-direction:column; gap:8px;}
+.fm-status{font-size:12.5px; color:var(--muted); min-height:18px;}
+.fm-status.err{color:var(--err);} .fm-status.ok{color:var(--ok);}
+
+/* ------------------------------------------------------------- dialogs */
+dialog{border:1px solid var(--border); border-radius:14px; background:var(--surface); color:var(--text); padding:0;
+  width:min(560px,94vw); max-height:86vh; box-shadow:var(--shadow-lg);}
+dialog.wide{width:min(900px,96vw);}
+dialog::backdrop{background:rgba(20,16,12,.42); backdrop-filter:blur(2px);}
+.dlg-h{display:flex; align-items:center; gap:10px; padding:15px 18px; border-bottom:1px solid var(--border-in);}
+.dlg-h h2{margin:0; font-size:15px; font-weight:650;}
+.dlg-b{padding:16px 18px; overflow:auto; max-height:66vh; display:flex; flex-direction:column; gap:12px;}
+.dlg-f{display:flex; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid var(--border-in);}
+/* docs */
+.docs{display:grid; grid-template-columns:250px minmax(0,1fr); gap:16px; align-items:start;}
+.docs-nav{position:sticky; top:0; max-height:calc(100vh - 120px); overflow:auto;}
+.docs-q{display:flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:8px; padding:6px 10px; background:var(--alt);}
+.docs-q svg{width:15px; height:15px; color:var(--faint); flex:none;}
+.docs-q input{border:0; background:transparent; color:var(--text); font:inherit; font-size:13px; width:100%; outline:none;}
+#docList a{display:block; padding:7px 16px; color:var(--muted); text-decoration:none; font-size:13px; border-left:2px solid transparent;}
+#docList a:hover{background:var(--hover); color:var(--text);}
+#docList a[aria-current="page"]{color:var(--accent); border-left-color:var(--accent); background:var(--accent-bg); font-weight:600;}
+#docList a small{display:block; color:var(--faint); font-size:11.5px; margin-top:2px; white-space:normal;}
+#docList mark, .md mark{background:var(--accent-bg); color:var(--accent); border-radius:3px; padding:0 2px;}
+.docs-main{min-width:0;}
+.md{padding:22px 28px 36px; font-size:14px; line-height:1.65; color:var(--text); max-width:880px;}
+.md h1{font-size:24px; margin:0 0 14px; line-height:1.25;}
+.md h2{font-size:18px; margin:30px 0 10px; padding-top:14px; border-top:1px solid var(--border-in);}
+.md h3{font-size:15px; margin:22px 0 8px;}
+.md h4{font-size:14px; margin:18px 0 6px; color:var(--muted);}
+.md h1,.md h2,.md h3,.md h4{scroll-margin-top:12px;}
+.md hr + h2{border-top:0; padding-top:0; margin-top:8px;}
+.md p{margin:0 0 12px;}
+.md ul,.md ol{margin:0 0 12px; padding-left:22px;}
+.md li{margin:3px 0;}
+.md a{color:var(--accent); text-decoration:underline; text-underline-offset:2px;}
+.md code{font-family:var(--mono); font-size:12.5px; background:var(--alt); border:1px solid var(--border-in); border-radius:5px; padding:1px 5px; overflow-wrap:anywhere;}
+.md pre{position:relative; margin:0 0 14px; background:var(--alt); border:1px solid var(--border); border-radius:8px; padding:12px 14px; overflow:auto;}
+.md pre code{border:0; background:none; padding:0; font-size:12.5px; line-height:1.55; white-space:pre; overflow-wrap:normal;}
+.md pre .btn{position:absolute; top:6px; right:6px; opacity:.75;}
+.md pre:hover .btn{opacity:1;}
+.md table{border-collapse:collapse; margin:0 0 14px; font-size:13px; display:block; overflow:auto; max-width:100%;}
+.md th,.md td{border:1px solid var(--border); padding:6px 10px; text-align:left; vertical-align:top;}
+.md th{background:var(--alt); font-weight:600;}
+.md blockquote{margin:0 0 12px; padding:2px 14px; border-left:3px solid var(--accent-br); color:var(--muted);}
+.md hr{border:0; border-top:1px solid var(--border); margin:24px 0;}
+.md .toc{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 18px;}
+.md .toc a{font-size:12px; text-decoration:none; border:1px solid var(--border); border-radius:999px; padding:3px 10px; color:var(--muted);}
+.md .toc a:hover{color:var(--accent); border-color:var(--accent-br);}
+@media (max-width:860px){
+  .docs{grid-template-columns:1fr;}
+  .docs-nav{position:static; max-height:none;}
+  #docList{display:flex; flex-wrap:wrap; gap:4px; padding:0 12px 12px;}
+  #docList a{border:1px solid var(--border); border-radius:999px; padding:4px 10px;}
+  #docList a[aria-current="page"]{border-color:var(--accent);}
+  .md{padding:16px 16px 28px;}
+}
+.codebox{display:flex; gap:8px; align-items:stretch;}
+.codebox code{flex:1; font:12px/1.5 var(--mono); background:var(--alt); border:1px solid var(--border); border-radius:8px;
+  padding:9px 11px; overflow-wrap:anywhere; user-select:all;}
+
+/* -------------------------------------------------------------- toasts */
+.toasts{position:fixed; right:18px; bottom:18px; display:flex; flex-direction:column; gap:8px; z-index:60;
+  max-width:min(420px,calc(100vw - 36px));}
+.toast{display:flex; gap:10px; align-items:flex-start; background:var(--surface); border:1px solid var(--border);
+  border-left:4px solid var(--accent); border-radius:10px; padding:10px 12px; box-shadow:var(--shadow-lg);
+  font-size:13px; animation:slidein .18s ease; white-space:pre-line;}
+.toast.ok{border-left-color:var(--ok);} .toast.bad{border-left-color:var(--err);} .toast.warn{border-left-color:var(--warn);}
+.toast .x{margin-left:auto; cursor:pointer; color:var(--faint); background:none; border:0; padding:0 0 0 6px; font-size:16px; line-height:1;}
+@keyframes slidein{from{transform:translateY(8px); opacity:0}to{transform:none; opacity:1}}
+
+.checks{display:flex; flex-direction:column; gap:2px;}
+.chk{display:flex; gap:10px; align-items:flex-start; padding:7px 2px; font-size:13px;}
+.chk .ic{width:18px; height:18px; border-radius:50%; display:grid; place-items:center; flex:none; margin-top:1px;}
+.chk .ic svg{width:11px; height:11px;}
+.chk.ok .ic{background:var(--ok-bg); color:var(--ok);}
+.chk.warn .ic{background:var(--warn-bg); color:var(--warn);}
+.chk.bad .ic{background:var(--err-bg); color:var(--err);}
+.chk small{display:block; color:var(--muted); font-size:12px; white-space:pre-line;}
+.spin{width:14px; height:14px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--accent);
+  animation:spin .8s linear infinite; display:inline-block; vertical-align:-2px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.machinepick{display:flex; flex-wrap:wrap; gap:6px;}
+.machinepick label{display:inline-flex; align-items:center; gap:6px; padding:4px 10px 4px 8px; border-radius:999px;
+  border:1px solid var(--border); background:var(--surface); font-size:12.5px; cursor:pointer; user-select:none;}
+.machinepick label:has(input:checked){border-color:var(--accent-br); background:var(--accent-bg); color:var(--accent);}
+.machinepick label.off{opacity:.5;}
+.machinepick input{margin:0; accent-color:var(--accent);}
+.help p{margin:0 0 8px;} .help p:last-child{margin-bottom:0;}
+.help{font-size:12.5px; color:var(--muted);}
+.help code,.inline-code{font-family:var(--mono); font-size:12px; background:var(--alt); border:1px solid var(--border);
+  border-radius:5px; padding:0 4px; color:var(--text);}
+
+/* ---------------------------------------------------------- responsive */
+@media (max-width:1180px){ .hide-l{display:none;} .kpis{grid-template-columns:repeat(2,minmax(0,1fr));} }
+@media (max-width:980px){ .grid2{grid-template-columns:minmax(0,1fr);} .hide-m{display:none;} }
+@media (max-width:860px){
+  .app{grid-template-columns:1fr; grid-template-rows:auto 1fr;}
+  .nav{flex-direction:row; align-items:center; overflow-x:auto; padding:8px 10px; gap:2px; border-right:0;
+    border-bottom:1px solid var(--border);}
+  .brand{padding:0 8px 0 2px;} .brand-text{display:none;}
+  .navlink{width:auto; flex:none; padding:7px 10px;} .navlink .count,.navlink .lock{display:none;}
+  .navlink span.lbl{display:none;}
+  .nav-sep{display:none;}
+  .nav-foot{margin:0 0 0 auto; flex-direction:row; align-items:center;}
+  .healthcard{padding:6px 8px;} .healthcard span{display:none;} .healthcard b{white-space:nowrap;}
+  .nav-tools .ver{display:none;}
+  .topbar{padding:12px 16px 8px;} .content{padding:4px 16px 18px;}
+  .sheet{left:0;}
+  .fm{grid-template-columns:minmax(0,1fr); height:auto;}
+  .fm-mid{flex-direction:row; padding:10px; border:0; border-top:1px solid var(--border-in); border-bottom:1px solid var(--border-in);}
+  .fm-pane{height:46vh;}
+  .searchbox{width:100%;}
+}
+@media (max-width:560px){ .hide-s{display:none;} .kpis{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
+  .topbar h1{font-size:17px;} .grid3{grid-template-columns:minmax(0,1fr);} .topbar-right .live span{display:none;} }
+@media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important;} }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-machines" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></g></symbol>
+    <symbol id="i-files" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></g></symbol>
+    <symbol id="i-run" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12.5 15H17"/></g></symbol>
+    <symbol id="i-queue" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></g></symbol>
+    <symbol id="i-this" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></g></symbol>
+    <symbol id="i-network" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.5 6h7M7.2 8.2l3.6 7.6M16.8 8.2l-3.6 7.6"/></g></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></g></symbol>
+    <symbol id="i-docs" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5M8 7.5h8M8 11h6"/></g></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></g></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-bang" viewBox="0 0 24 24"><path d="M12 5v9M12 19v.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></g></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></g></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4"/></g></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-auto" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></g></symbol>
+    <symbol id="i-term" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7l5 5-5 5M12 18h7"/></g></symbol>
+    <symbol id="i-screen" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></g></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></g></symbol>
+    <symbol id="i-power" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/></g></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13"/></g></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></g></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5M20 20v-4h-4"/></g></symbol>
+    <symbol id="i-log" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"/></g></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></g></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></g></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.8-.9 1.4v.6M12 17.1h.01"/></g></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <nav class="nav" aria-label="Sections">
+    <div class="brand">
+      <div class="brand-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="10" r="3.2" fill="#fff"/><circle cx="23" cy="10" r="3.2" fill="#fff"/><circle cx="16" cy="23" r="3.2" fill="#fff"/><path d="M9 10L23 10L16 23Z" fill="none" stroke="#fff" stroke-width="1.8"/></svg></div>
+      <div class="brand-text"><div class="brand-name">LocNet</div><div class="brand-net" id="netName">connecting…</div></div>
+    </div>
+    <button class="navlink" data-page="machines"><svg><use href="#i-machines"/></svg><span class="lbl">Machines</span><span class="count" id="cMachines"></span></button>
+    <button class="navlink" data-page="files"><svg><use href="#i-files"/></svg><span class="lbl">Files</span></button>
+    <button class="navlink" data-page="run"><svg><use href="#i-run"/></svg><span class="lbl">Run</span><span class="count" id="cRun"></span></button>
+    <button class="navlink" data-page="queue"><svg><use href="#i-queue"/></svg><span class="lbl">Queue</span><span class="count" id="cQueue"></span></button>
+    <div class="nav-sep"></div>
+    <button class="navlink" data-page="this"><svg><use href="#i-this"/></svg><span class="lbl">This machine</span></button>
+    <button class="navlink" data-page="network"><svg><use href="#i-network"/></svg><span class="lbl">Network</span><svg class="lock" id="netLock"><use href="#i-lock"/></svg></button>
+    <button class="navlink" data-page="docs"><svg><use href="#i-docs"/></svg><span class="lbl">Docs</span></button>
+    <div class="nav-foot">
+      <button class="healthcard" id="healthCard" title="What needs attention">
+        <i class="hdot" id="hDot"></i>
+        <div><b id="hTitle">Connecting…</b><span id="hSub">asking locnetd</span></div>
+      </button>
+      <div class="nav-tools">
+        <button class="iconbtn bare" id="btnTheme" title="Theme: follow the system"><svg><use href="#i-auto"/></svg></button>
+        <button class="iconbtn bare" id="btnHelp" title="Keyboard shortcuts and help"><svg><use href="#i-help"/></svg></button>
+        <span class="ver" id="ver"></span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="main">
+    <header class="topbar">
+      <div><h1 id="pTitle">Machines</h1><div class="sub" id="pSub"></div></div>
+      <div class="topbar-right">
+        <div class="searchbox hide-s" id="searchWrap"><svg><use href="#i-search"/></svg>
+          <input type="search" id="q" placeholder="Filter machines" autocomplete="off" spellcheck="false" aria-label="Filter machines"><kbd>/</kbd></div>
+        <span class="live on" id="live" title="Updates every few seconds. Click to pause."><i></i><span>Live</span></span>
+        <button class="iconbtn badge-dot" id="btnActivity" title="Activity log" data-n="0"><svg><use href="#i-log"/></svg></button>
+      </div>
+    </header>
+
+    <div class="content" id="content">
+
+      <!-- ===================================================== machines -->
+      <section class="page" data-page="machines">
+        <div class="kpis" id="kpis"></div>
+        <div id="alerts" class="stack"></div>
+        <div class="card">
+          <div class="toolbar">
+            <div class="seg" id="stateFilter">
+              <button data-f="all" aria-pressed="true">All</button>
+              <button data-f="online" aria-pressed="false">Online</button>
+              <button data-f="offline" aria-pressed="false">Offline</button>
+            </div>
+            <span class="spacer"></span>
+            <span class="faint hide-s" id="rowCount" style="font-size:12px"></span>
+          </div>
+          <div class="tablewrap">
+            <table class="grid clickable" id="mTable">
+              <thead><tr id="mHead"></tr></thead>
+              <tbody id="mRows"></tbody>
+            </table>
+          </div>
+          <div class="bulkbar" id="bulk" hidden>
+            <b id="bulkN"></b>
+            <button class="btn btn-sm" data-bulk="run"><svg><use href="#i-term"/></svg>Run a command</button>
+            <button class="btn btn-sm" data-bulk="send"><svg><use href="#i-share"/></svg>Send files</button>
+            <button class="btn btn-sm" data-bulk="fetch"><svg><use href="#i-files"/></svg>Collect a file</button>
+            <span class="spacer"></span>
+            <button class="btn btn-sm btn-ghost" data-bulk="clear">Clear selection</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== files -->
+      <section class="page" data-page="files" hidden>
+        <div class="card">
+          <div class="fm">
+            <div class="fm-pane">
+              <div class="fm-bar">
+                <span class="who" id="fmLName">This computer</span>
+                <button class="iconbtn bare" id="fmLUp" title="Up one folder"><svg><use href="#i-up"/></svg></button>
+                <input type="text" id="fmLPath" spellcheck="false" aria-label="Folder on this computer">
+                <button class="iconbtn bare" id="fmLRe" title="Reload"><svg><use href="#i-refresh"/></svg></button>
+              </div>
+              <div class="fm-list" id="fmLList"></div>
+            </div>
+            <div class="fm-mid">
+              <button class="btn btn-primary" id="fmSend">Send <span aria-hidden="true">→</span></button>
+              <button class="btn" id="fmFetch"><span aria-hidden="true">←</span> Fetch</button>
+            </div>
+            <div class="fm-pane">
+              <div class="fm-bar">
+                <select id="fmPeer" aria-label="Machine"></select>
+                <button class="iconbtn bare" id="fmRUp" title="Up one folder"><svg><use href="#i-up"/></svg></button>
+                <input type="text" id="fmRPath" spellcheck="false" aria-label="Folder on the other machine">
+                <button class="iconbtn bare" id="fmRRe" title="Reload"><svg><use href="#i-refresh"/></svg></button>
+              </div>
+              <div class="fm-list" id="fmRList"></div>
+            </div>
+          </div>
+          <div class="fm-foot">
+            <div class="progress" id="fmBar" hidden><i id="fmFill"></i></div>
+            <div class="fm-status" id="fmStatus">Click files to select them, double-click a folder to open it. Transfers use SSH (rsync where available), so you need an account on the other machine.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h2>Same path on several machines</h2><span class="sub">uses the machines ticked on the Machines page</span></div>
+          <div class="card-b row">
+            <input type="text" id="fmMany" style="flex:1; min-width:220px" spellcheck="false"
+              placeholder="a path, e.g. /var/log/syslog or ~/results">
+            <button class="btn" id="fmManySend">Send it to all</button>
+            <button class="btn" id="fmManyFetch">Collect from all</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================== run -->
+      <section class="page" data-page="run" hidden>
+        <div class="card">
+          <div class="card-h">
+            <h2>Run a command</h2>
+            <div class="right">
+              <div class="seg" id="runMode">
+                <button data-mode="ssh" aria-pressed="true">Shell (SSH)</button>
+                <button data-mode="compute" aria-pressed="false">Compute</button>
+              </div>
+            </div>
+          </div>
+          <div class="card-b stack">
+            <div class="help" id="runHelp"></div>
+            <div><div class="row" style="justify-content:space-between; margin-bottom:6px">
+              <span style="font-size:12px; font-weight:560; color:var(--muted)">On</span>
+              <span class="row"><button class="btn btn-sm btn-ghost" id="pickAll">All online</button><button class="btn btn-sm btn-ghost" id="pickNone">None</button></span></div>
+              <div class="machinepick" id="runTargets"></div></div>
+            <div class="row" style="flex-wrap:nowrap">
+              <input type="text" id="runCmd" class="mono" spellcheck="false" autocomplete="off" placeholder="uptime" style="flex:1">
+              <button class="btn btn-primary" id="runGo"><svg><use href="#i-term"/></svg>Run</button>
+              <button class="btn btn-danger" id="runStop" hidden>Stop</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h2>Output</h2>
+            <div class="right"><label class="check"><input type="checkbox" id="follow" checked> follow</label>
+            <button class="btn btn-sm btn-ghost" id="logClear">Clear</button></div></div>
+          <div class="card-b"><div id="logDockRun"></div></div>
+        </div>
+      </section>
+
+      <!-- ======================================================== queue -->
+      <section class="page" data-page="queue" hidden>
+        <div class="grid2" style="grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)">
+          <div class="card">
+            <div class="card-h"><h2>Queue a job</h2><span class="sub">waits on the hub until a machine fits</span></div>
+            <div class="card-b stack">
+              <label class="field">Command <input type="text" id="qCmd" class="mono" spellcheck="false" placeholder="make -j8"></label>
+              <div class="grid3">
+                <label class="field">Cores <input type="number" id="qCpus" min="0" placeholder="any"></label>
+                <label class="field">Free RAM (GB) <input type="number" id="qMem" min="0" placeholder="any"></label>
+                <label class="field">Copies <input type="number" id="qN" min="1" value="1"></label>
+              </div>
+              <div class="grid3">
+                <label class="field">Only on <select id="qOn"><option value="">any machine</option></select></label>
+                <label class="field">Time limit (s) <input type="number" id="qMax" min="0" placeholder="default"></label>
+                <label class="field">Priority <input type="number" id="qPrio" value="0"></label>
+              </div>
+              <div class="row"><label class="check"><input type="checkbox" id="qGpu"> needs a GPU</label>
+                <span class="spacer"></span><button class="btn btn-primary" id="qSubmit"><svg><use href="#i-plus"/></svg>Queue it</button></div>
+              <div class="help">There is no shell: the words are run exactly as typed. A machine takes a job only if
+                its own compute setting allows this one — see <a href="#this">This machine</a> on each.</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Jobs</h2><span class="sub" id="qCount"></span>
+              <div class="right"><label class="check"><input type="checkbox" id="qAll"> show finished</label></div></div>
+            <div class="tablewrap"><table class="grid" id="qTable"><thead><tr>
+              <th>Job</th><th>State</th><th class="hide-s">Where</th><th class="hide-m">From</th><th>Command</th><th class="r"></th>
+            </tr></thead><tbody id="qRows"></tbody></table></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h2>Machines taking work</h2><span class="sub">those whose compute setting accepts this machine's jobs</span></div>
+          <div class="card-b tight"><div id="qWorkers"></div></div>
+        </div>
+      </section>
+
+      <!-- ================================================= this machine -->
+      <section class="page" data-page="this" hidden>
+        <div class="grid2">
+          <div class="card">
+            <div class="card-h"><h2>Connection</h2>
+              <div class="right"><label class="switch" title="Bring the tunnel up or down"><span id="tunLbl" class="muted">Tunnel</span><input type="checkbox" id="tunSw"><span class="track"></span></label></div></div>
+            <div class="card-b"><dl class="kv" id="connKv"></dl></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Check connections</h2><span class="sub">sends real traffic, both ways</span>
+              <div class="right"><button class="btn btn-sm" id="diagGo"><svg><use href="#i-refresh"/></svg>Run checks</button></div></div>
+            <div class="card-b" id="diagOut"><div class="help">Asks locnetd what it believes, then tests it: a connection through the tunnel to every machine
+              that is online, and one of them connecting back to this machine's own services — the only way a firewall here shows up.</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h2>Shared from this machine</h2><span class="sub">folders and services other machines may use — nobody, until you say who</span>
+            <div class="right"><button class="btn btn-sm btn-primary" id="shAddBtn"><svg><use href="#i-plus"/></svg>Share something</button></div></div>
+          <div class="card-b tight"><div id="shList"></div></div>
+        </div>
+        <div class="grid2">
+          <div class="card">
+            <div class="card-h"><h2>Compute</h2><span class="sub">let other machines run work here</span>
+              <div class="right"><label class="switch"><input type="checkbox" id="cpOn"><span class="track"></span></label></div></div>
+            <div class="card-b stack">
+              <label class="field">Who may submit work <span class="hint">machine names, comma-separated, or * for all</span>
+                <input type="text" id="cpAllow" spellcheck="false" placeholder="workstation, laptop"></label>
+              <div class="grid2" style="gap:12px">
+                <label class="field">Run jobs as <input type="text" id="cpUser" spellcheck="false"></label>
+                <label class="field">Time limit (s) <input type="number" id="cpMax" min="0" placeholder="3600"></label>
+              </div>
+              <label class="field">Note shown to others <input type="text" id="cpLabel" placeholder="e.g. has the big GPU"></label>
+              <div class="row end"><span class="faint" id="cpState" style="font-size:12px; margin-right:auto"></span><button class="btn btn-primary" id="cpSave">Save</button></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Names and screen</h2></div>
+            <div class="card-b stack">
+              <label class="switch" style="justify-content:space-between; width:100%"><span><b style="font-weight:600">Peer names in the hosts file</b>
+                <span class="help" style="display:block">so <span class="inline-code">ssh hubpc</span> works without LocNet</span></span>
+                <input type="checkbox" id="hostsSw"><span class="track"></span></label>
+              <div id="deskBox"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================== network -->
+      <section class="page" data-page="network" hidden>
+        <div id="netLocked" class="card" hidden>
+          <div class="card-b stack" style="padding:22px">
+            <div class="notice info"><svg><use href="#i-lock"/></svg><div class="body">
+              <b>This machine cannot administer the network yet.</b><br>
+              Inviting machines, admitting them and taking them off the network is signed with this machine's own key,
+              and the hub only accepts that from machines it has been told to trust. On the hub machine, run:
+              <div class="codebox" style="margin-top:8px"><code id="grantCmd"></code><button class="btn btn-sm" data-copy-from="grantCmd"><svg><use href="#i-copy"/></svg>Copy</button></div>
+              Then reload this page.</div></div>
+          </div>
+        </div>
+        <div id="netOpen" class="stack" style="gap:16px">
+          <div class="grid2" style="grid-template-columns:minmax(0,1fr) minmax(0,1.4fr)">
+            <div class="card">
+              <div class="card-h"><h2>Invite a machine</h2></div>
+              <div class="card-b stack">
+                <label class="field">Note <input type="text" id="invLabel" placeholder="e.g. new laptop"></label>
+                <div class="grid2" style="gap:12px">
+                  <label class="field">Good for <select id="invUses"><option value="1">1 machine</option><option value="5">5 machines</option><option value="-1">any number</option></select></label>
+                  <label class="field">Expires <select id="invTtl"><option value="1h">in an hour</option><option value="24h" selected>in a day</option><option value="168h">in a week</option><option value="">never</option></select></label>
+                </div>
+                <div class="row end"><button class="btn btn-primary" id="invGo"><svg><use href="#i-plus"/></svg>Create join code</button></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-h"><h2>Join codes</h2><span class="sub" id="invCount"></span></div>
+              <div class="card-b tight"><div id="invList"></div></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Members</h2><span class="sub">as the hub records them</span>
+              <div class="right"><button class="btn btn-sm btn-ghost" id="netRe"><svg><use href="#i-refresh"/></svg>Reload</button></div></div>
+            <div class="tablewrap"><table class="grid"><thead><tr>
+              <th>Machine</th><th>State</th><th class="hide-s">Address</th><th class="hide-m">Last seen</th><th class="hide-m">Joined</th><th class="r"></th>
+            </tr></thead><tbody id="netRows"></tbody></table></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Who may connect to whom</h2><span class="sub">each row may open connections to each column — click a cell to change it</span></div>
+            <div class="tablewrap"><table class="grid acc" id="accTable"></table></div>
+            <div class="card-b"><div class="help" id="accNote">One-way: blocking a row from a column still lets the column connect to the row, and replies come back.
+              This decides who may <i>connect</i>; each machine still decides for itself whether it shares files or runs jobs.</div></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>WebShare</h2><span class="sub">sites published to the internet through the hub</span></div>
+            <div class="card-b tight" id="webHead"></div>
+            <div class="tablewrap"><table class="grid"><thead><tr>
+              <th>Site</th><th>State</th><th class="hide-s">Machine</th><th class="hide-m">Serves</th><th class="hide-m r">Requests</th><th class="r"></th>
+            </tr></thead><tbody id="webRows"></tbody></table></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Recent changes</h2><span class="sub">joins, removals and settings — connections are never logged</span></div>
+            <div class="card-b tight"><div id="auditList"></div></div>
+          </div>
+        </div>
+      </section>
+      <section class="page" data-page="docs" hidden>
+        <div class="docs">
+          <aside class="card docs-nav">
+            <div class="card-b" style="padding-bottom:8px">
+              <label class="search docs-q"><svg><use href="#i-search"/></svg><input type="search" id="docQ" placeholder="Search the documentation" aria-label="Search the documentation"></label>
+            </div>
+            <nav id="docList" aria-label="Documents"></nav>
+          </aside>
+          <article class="card docs-main"><div class="md" id="docBody"><div class="empty">Loading…</div></div></article>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- machine detail -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Machine details" aria-hidden="true">
+  <div class="drawer-h">
+    <div style="min-width:0; flex:1"><h2 id="dName"></h2><div class="sub" id="dSub"></div></div>
+    <button class="iconbtn bare" id="dClose" title="Close (Esc)"><svg><use href="#i-x"/></svg></button>
+  </div>
+  <div class="drawer-b" id="dBody"></div>
+</aside>
+
+<!-- activity -->
+<section class="sheet" id="sheet" aria-label="Activity">
+  <div class="sheet-h"><h2>Activity</h2><span class="faint" style="font-size:12px">everything this page has done, newest at the bottom</span>
+    <span class="spacer"></span><button class="btn btn-sm btn-ghost" id="sheetClear">Clear</button>
+    <button class="iconbtn bare" id="sheetClose" title="Close"><svg><use href="#i-x"/></svg></button></div>
+  <div class="sheet-b" id="logDockSheet"><div class="term" id="log"><div class="empty">Nothing yet. Commands, transfers and connections show up here.</div></div></div>
+</section>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<dialog id="dlg"><div class="dlg-h"><h2 id="dlgT"></h2><span class="spacer"></span>
+  <button class="iconbtn bare" data-close title="Close"><svg><use href="#i-x"/></svg></button></div>
+  <div class="dlg-b" id="dlgB"></div><div class="dlg-f" id="dlgF"></div></dialog>
+
+<script>
+"use strict";
+const TOKEN = new URLSearchParams(location.search).get("t") || "";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const icon = (name, cls) => `<svg${cls ? ` class="${cls}"` : ""}><use href="#i-${name}"/></svg>`;
+
+const S = {
+  st: null, info: {}, accounts: {}, sel: new Set(), detail: null, page: "machines",
+  filter: "", stateFilter: "all", sort: {key: "name", dir: 1}, live: true,
+  queue: [], admin: null, runMode: "ssh", runTargets: new Set(), lastHash: "",
+};
+
+/* ---------------------------------------------------------------- api */
+async function api(path, opts = {}) {
+  const res = await fetch(path, {...opts, headers: {"X-Token": TOKEN, "Content-Type": "application/json", ...(opts.headers || {})}});
+  const text = await res.text();
+  let body; try { body = text ? JSON.parse(text) : {}; } catch { body = {error: text.trim()}; }
+  if (!res.ok) throw new Error((body && body.error) || res.statusText || ("HTTP " + res.status));
+  return body;
+}
+const post = (path, body) => api(path, {method: "POST", body: JSON.stringify(body || {})});
+
+/* --------------------------------------------------------- formatting */
+function bytes(n) {
+  if (n == null) return "";
+  const u = ["B","KB","MB","GB","TB"]; let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return (i === 0 ? n : n.toFixed(n < 10 ? 1 : 0)) + " " + u[i];
+}
+function ago(t) {
+  if (!t) return "never";
+  const d = (Date.now() - new Date(t).getTime()) / 1000;
+  if (!isFinite(d) || d < 0) return "just now";
+  if (d < 60) return "just now";
+  if (d < 3600) return Math.floor(d / 60) + " min ago";
+  if (d < 172800) return Math.floor(d / 3600) + " h ago";
+  return Math.floor(d / 86400) + " days ago";
+}
+function when(unix) {
+  if (!unix) return "";
+  const d = new Date(unix * 1000), now = new Date();
+  return d.toDateString() === now.toDateString()
+    ? d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})
+    : d.toLocaleDateString([], {year: d.getFullYear() === now.getFullYear() ? undefined : "numeric", month: "short", day: "numeric"});
+}
+function gb(mb) { return mb ? (mb / 1024).toFixed(mb >= 10240 ? 0 : 1) + " GB" : "—"; }
+const lvl = (p) => p >= 90 ? "bad" : p >= 75 ? "warn" : "";
+function meter(pct, label) {
+  if (pct == null || !isFinite(pct) || pct < 0) return '<span class="faint">—</span>';
+  return `<span class="meter"><span class="bar"><i class="${lvl(pct)}" style="width:${Math.min(100, Math.max(3, pct)).toFixed(0)}%"></i></span>${esc(label ?? pct.toFixed(0) + "%")}</span>`;
+}
+const cpuPct  = (s) => s && s.cpus ? (s.load_percent || 0) : null;
+const memPct  = (s) => s && s.mem_total_mb ? (1 - (s.mem_free_mb || 0) / s.mem_total_mb) * 100 : null;
+const diskPct = (s) => s && s.disk_total_gb ? (1 - (s.disk_free_gb || 0) / s.disk_total_gb) * 100 : null;
+const osName = (os) => ({linux: "Linux", darwin: "macOS", windows: "Windows"})[os] || os || "unknown";
+
+/* ------------------------------------------------------- activity log */
+let unread = 0;
+function logLine(node, cls) {
+  const box = $("log");
+  const empty = box.querySelector(".empty");
+  if (empty) empty.remove();
+  const el = document.createElement("div");
+  el.className = "ln" + (cls ? " " + cls : "");
+  el.appendChild(node);
+  box.appendChild(el);
+  while (box.childElementCount > 3000) box.firstElementChild.remove();
+  if ($("follow").checked) box.scrollTop = box.scrollHeight;
+  if (!$("sheet").classList.contains("on") && S.page !== "run") { unread++; $("btnActivity").dataset.n = String(Math.min(unread, 99)); }
+}
+function log(text, cls) {
+  const f = document.createDocumentFragment();
+  const t = document.createElement("span"); t.className = "t";
+  t.textContent = new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"}) + "  ";
+  f.appendChild(t); f.appendChild(document.createTextNode(text));
+  logLine(f, cls);
+}
+/* Command output is a text node, never markup. */
+function logOut(target, text, cls) {
+  const f = document.createDocumentFragment();
+  if (target) { const t = document.createElement("span"); t.className = "tgt"; t.textContent = target + "  "; f.appendChild(t); }
+  f.appendChild(document.createTextNode(text));
+  logLine(f, cls);
+}
+function clearLog() { $("log").innerHTML = '<div class="empty">Nothing yet. Commands, transfers and connections show up here.</div>'; }
+$("logClear").onclick = clearLog; $("sheetClear").onclick = clearLog;
+
+function toast(msg, kind = "", ms) {
+  const el = document.createElement("div");
+  el.className = "toast " + kind;
+  const span = document.createElement("div"); span.textContent = msg;
+  const x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.title = "Dismiss";
+  el.append(span, x);
+  $("toasts").appendChild(el);
+  const kill = () => el.remove();
+  x.onclick = kill;
+  setTimeout(kill, ms || (kind === "bad" ? 9000 : 4500));
+  while ($("toasts").childElementCount > 4) $("toasts").firstElementChild.remove();
+}
+
+/* ------------------------------------------------------------ dialogs */
+function dialog({title, body, actions = [], wide = false}) {
+  return new Promise((resolve) => {
+    const d = $("dlg");
+    d.className = wide ? "wide" : "";
+    $("dlgT").textContent = title;
+    const b = $("dlgB"); b.innerHTML = "";
+    if (typeof body === "string") b.innerHTML = body; else if (body) b.appendChild(body);
+    const f = $("dlgF"); f.innerHTML = ""; f.hidden = !actions.length;
+    for (const a of actions) {
+      const btn = document.createElement("button");
+      btn.className = "btn " + (a.cls || "");
+      btn.textContent = a.label;
+      btn.onclick = () => { d.close(); resolve(a.value); };
+      f.appendChild(btn);
+    }
+    d.onclose = () => resolve(undefined);
+    d.showModal();
+    const first = b.querySelector("input,select,textarea") || f.querySelector(".btn-primary,.btn-danger");
+    if (first) first.focus();
+  });
+}
+$("dlg").addEventListener("click", (e) => {
+  if (e.target.closest("[data-close]") || e.target === $("dlg")) $("dlg").close();
+});
+const confirmBox = (title, html, ok = "Continue", danger = false) =>
+  dialog({title, body: `<div class="help" style="font-size:13px; color:var(--text)">${html}</div>`,
+          actions: [{label: "Cancel", value: false, cls: "btn-ghost"}, {label: ok, value: true, cls: danger ? "btn-danger solid" : "btn-primary"}]});
+
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); }
+  toast("Copied.", "ok", 1600);
+}
+document.addEventListener("click", (e) => {
+  const c = e.target.closest("[data-copy]");
+  if (c) { e.stopPropagation(); copy(c.dataset.copy); return; }
+  const cf = e.target.closest("[data-copy-from]");
+  if (cf) copy($(cf.dataset.copyFrom).textContent);
+});
+
+/* ------------------------------------------------------------- router */
+const PAGES = {
+  machines: ["Machines", () => machinesSub()],
+  files:    ["Files", () => "Copy between this computer and the others, over SSH"],
+  run:      ["Run", () => "One command, on as many machines as you like"],
+  queue:    ["Queue", () => "Work that waits for a free machine"],
+  this:     ["This machine", () => S.st && S.st.name ? `${S.st.name} · ${S.st.ip || ""}` : ""],
+  network:  ["Network", () => S.st && S.st.network ? `Administering ${S.st.network}` : ""],
+  docs:     ["Docs", () => "Everything LocNet does, and every command — for the version running here"],
+};
+function go(page) {
+  if (!PAGES[page]) page = "machines";
+  if (location.hash !== "#" + page && !location.hash.startsWith("#machine:") && !(page === "docs" && location.hash.startsWith("#docs:"))) history.replaceState(null, "", location.pathname + location.search + "#" + page);
+  S.page = page;
+  for (const b of document.querySelectorAll(".navlink")) b.setAttribute("aria-current", b.dataset.page === page ? "page" : "false");
+  for (const s of document.querySelectorAll("section.page")) s.hidden = s.dataset.page !== page;
+  $("pTitle").textContent = PAGES[page][0];
+  $("pSub").textContent = PAGES[page][1]();
+  $("searchWrap").style.visibility = page === "machines" ? "visible" : "hidden";
+  // The one log lives on the Run page there, and in the activity sheet elsewhere.
+  (page === "run" ? $("logDockRun") : $("logDockSheet")).appendChild($("log"));
+  $("log").style.height = page === "run" ? "min(52vh, 520px)" : "";
+  if (page === "run") { $("sheet").classList.remove("on"); unread = 0; $("btnActivity").dataset.n = "0"; renderRunTargets(); }
+  if (page === "machines" && S.st) { lastTableKey = ""; renderMachines(); }
+  if (page === "files") fmEnter();
+  if (page === "queue") queueRefresh();
+  if (page === "this") renderThis(true);
+  if (page === "network") netEnter();
+  $("content").scrollTop = 0;
+  if (page === "docs") docsEnter();
+}
+// Keep the token in the URL: it is how a reload stays authorised. A hash of
+// "#machine:NAME" is a link straight to that machine's details.
+function hashPage() {
+  const h = decodeURIComponent((location.hash || "#machines").slice(1));
+  if (h.startsWith("machine:")) { setTimeout(() => openDetail(h.slice(8)), 0); return "machines"; }
+  // "#docs:NAME" and "#docs:NAME:section" link to a document, or a place in one.
+  if (h.startsWith("docs:")) { const [name, anchor] = h.slice(5).split(":"); DOCS.want = {name, anchor}; return "docs"; }
+  return h.split("?")[0];
+}
+document.querySelector(".nav").addEventListener("click", (e) => {
+  const b = e.target.closest(".navlink"); if (b) go(b.dataset.page);
+});
+window.addEventListener("hashchange", () => go(hashPage()));
+document.addEventListener("click", (e) => {
+  const a = e.target.closest('a[href^="#"]');
+  if (a && PAGES[a.getAttribute("href").slice(1)]) { e.preventDefault(); go(a.getAttribute("href").slice(1)); }
+});
+
+/* ------------------------------------------------------------- machines */
+const CLIENT = {ssh: "ssh", rdp: "rdp", vnc: "vnc", "vnc-1": "vnc", "vnc-2": "vnc", "vnc-3": "vnc", "vnc-4": "vnc",
+                http: "browser", https: "browser", "http-alt": "browser", smb: "smb"};
+function selfRow() {
+  const st = S.st;
+  if (!st || !st.registered || !st.name) return null;
+  return {name: st.name, ip: String(st.ip || ""), os: st.os || "", path: "local", online: !!st.running, self: true,
+          hub: !!st.is_hub, admin: !!st.is_admin, services: st.services || [], shares: (st.shares || []).map((x) => ({name: x.name, kind: x.kind})),
+          stats: st.stats || {}, groups: st.groups || [], compute: null, lan: st.lan || []};
+}
+function machines() {
+  const me = selfRow();
+  const peers = (S.st && S.st.peers) || [];
+  return me ? [me, ...peers] : peers;
+}
+const byName = (n) => machines().find((m) => m.name === n);
+const svcFor = (m, kind) => (m.services || []).find((s) => CLIENT[s.name] === kind) || null;
+
+function statusPill(m) {
+  if (m.self) return m.online ? '<span class="pill info">this computer</span>' : '<span class="pill bad">tunnel down</span>';
+  if (!m.online) return '<span class="pill bad">offline</span>';
+  if (m.path === "direct") return `<span class="pill ok">direct</span>`;
+  if (m.path === "relay") return '<span class="pill warn">relayed</span>';
+  return '<span class="pill idle">connecting</span>';
+}
+/* publishes names the service a port share puts on the network, when it is one
+   LocNet already lists — the "screen" share that setup creates is the machine's
+   VNC desktop, and showing it as a second, unexplained thing was confusing. */
+function publishes(m, share) {
+  if (share.kind !== "port") return null;
+  return (m.services || []).find((s) => s.port === share.port && CLIENT[s.name]) || null;
+}
+function svcTitle(s) {
+  if (s.problem) return "Not usable: " + s.problem;
+  return s.verified ? "another machine confirmed it can connect" : "found on the machine itself, not yet confirmed from outside";
+}
+function offers(m) {
+  const tags = [];
+  for (const s of m.services || []) if (CLIENT[s.name]) tags.push(`<span class="tag${s.problem ? " warn" : ""}" title="${esc(svcTitle(s))}">${esc(s.name)}${s.problem ? " ⚠" : s.verified ? "" : "?"}</span>`);
+  for (const s of m.shares || []) if (!publishes(m, s)) tags.push(`<span class="tag accent" title="shared ${esc(s.kind === "files" ? "folder" : "service on port " + s.port)}${s.description ? ": " + esc(s.description) : ""}">${esc(s.name)}</span>`);
+  if (m.compute) tags.push('<span class="tag ok">compute</span>');
+  if (m.restricted) tags.push('<span class="tag warn">port-limited</span>');
+  return tags.length ? `<span class="tags">${tags.join("")}</span>` : '<span class="faint">—</span>';
+}
+const COLS = [
+  {key: "name", label: "Machine", cell: (m) => `<div class="mname"><span class="os${m.online ? " on" : ""}">${icon(m.os === "windows" ? "screen" : "machines")}</span>
+     <div style="min-width:0"><b>${esc(m.name)}${m.hub ? ' <span class="tag ok">hub</span>' : ""}${m.self && m.admin ? ' <span class="tag accent">admin</span>' : ""}</b>
+     <small>${esc(osName(m.os))} · <span class="copyable" data-copy="${esc(m.ip)}" title="Copy address">${esc(m.ip)}</span></small></div></div>`},
+  {key: "status", label: "Status", cell: (m) => statusPill(m) + (m.online && m.latency ? ` <span class="faint" style="font-size:12px">${esc(m.latency)}</span>` : "")},
+  {key: "cpu", label: "CPU", cls: "hide-s", cell: (m) => m.online || m.self ? meter(cpuPct(m.stats), m.stats && m.stats.cpus ? `${(cpuPct(m.stats) || 0).toFixed(0)}% of ${m.stats.cpus}` : null) : '<span class="faint">—</span>'},
+  {key: "mem", label: "Memory", cls: "hide-l", cell: (m) => m.online || m.self ? meter(memPct(m.stats), m.stats && m.stats.mem_total_mb ? `${memPct(m.stats).toFixed(0)}% of ${gb(m.stats.mem_total_mb)}` : null) : '<span class="faint">—</span>'},
+  {key: "disk", label: "Disk free", cls: "hide-m", cell: (m) => m.stats && m.stats.disk_total_gb ? meter(diskPct(m.stats), `${m.stats.disk_free_gb} GB`) : '<span class="faint">—</span>'},
+  {key: "offers", label: "Offers", cls: "hide-l", cell: (m) => offers(m)},
+  {key: "seen", label: "Seen", cls: "hide-m", cell: (m) => `<span class="${m.online ? "" : "faint"}" style="font-size:12.5px; white-space:nowrap">${m.self || m.online ? "now" : m.last_seen ? esc(ago(m.last_seen)) : "—"}</span>`},
+];
+function sortVal(m, k) {
+  switch (k) {
+    case "status": return (m.self ? -1 : m.online ? 0 : 2) + (m.path === "direct" ? 0 : .5);
+    case "cpu": return -(cpuPct(m.stats) ?? -1);
+    case "mem": return -(memPct(m.stats) ?? -1);
+    case "disk": return -((m.stats && m.stats.disk_free_gb) || 0);
+    case "offers": return -((m.services || []).length + (m.shares || []).length);
+    case "seen": return m.online || m.self ? 0 : -new Date(m.last_seen || 0).getTime();
+    default: return String(m.name);
+  }
+}
+function visible() {
+  const f = S.filter;
+  const list = machines().filter((m) =>
+    (S.stateFilter === "all" || (S.stateFilter === "online" ? (m.online || m.self) : !(m.online || m.self))) &&
+    (!f || m.name.toLowerCase().includes(f) || String(m.ip).includes(f) || (m.os || "").includes(f) ||
+     (m.groups || []).some((g) => g.toLowerCase().includes(f)) ||
+     (m.services || []).some((s) => s.name.includes(f))));
+  list.sort((a, b) => {
+    if (a.self !== b.self) return a.self ? -1 : 1;
+    const x = sortVal(a, S.sort.key), y = sortVal(b, S.sort.key);
+    if (x < y) return -S.sort.dir; if (x > y) return S.sort.dir;
+    return a.name.localeCompare(b.name);
+  });
+  return list;
+}
+function machinesSub() {
+  const all = machines();
+  if (!S.st) return "";
+  if (!S.st.registered) return "This machine has not joined a network";
+  const on = all.filter((m) => m.online).length;
+  return `${on} of ${all.length} online in ${S.st.network || "this network"}`;
+}
+let lastTableKey = "";
+function renderMachines() {
+  const list = visible();
+  const head = `<th class="c-check"><input type="checkbox" id="selAll" title="Select all" aria-label="Select all"></th>` +
+    COLS.map((c) => `<th class="sortable ${c.cls || ""}${S.sort.key === c.key ? " sorted" : ""}" data-key="${c.key}">${c.label}${S.sort.key === c.key ? `<span class="arrow">${S.sort.dir > 0 ? "▲" : "▼"}</span>` : ""}</th>`).join("");
+  const rows = list.map((m) => `<tr data-name="${esc(m.name)}" class="${S.detail === m.name ? "active" : ""}${!m.online && !m.self ? " dim" : ""}">
+      <td class="c-check" data-nocl>${m.self ? "" : `<input type="checkbox" data-sel="${esc(m.name)}" aria-label="Select ${esc(m.name)}"${S.sel.has(m.name) ? " checked" : ""}>`}</td>` +
+      COLS.map((c) => `<td class="${c.cls || ""}">${c.cell(m)}</td>`).join("") + "</tr>").join("");
+  // Rebuilding the table under the pointer every three seconds would eat
+  // clicks and flicker; only do it when something visible changed.
+  const key = head + rows;
+  if (key !== lastTableKey) {
+    lastTableKey = key;
+    $("mHead").innerHTML = head;
+    $("mRows").innerHTML = rows || `<tr><td colspan="${COLS.length + 1}"><div class="empty"><b>${S.filter || S.stateFilter !== "all" ? "No machine matches" : "No machines yet"}</b>${S.filter || S.stateFilter !== "all" ? "Clear the filter to see everything." : "Invite one from the Network page."}</div></td></tr>`;
+  }
+  const peers = list.filter((m) => !m.self);
+  const sa = $("selAll");
+  if (sa) { sa.checked = peers.length > 0 && peers.every((m) => S.sel.has(m.name)); sa.indeterminate = !sa.checked && peers.some((m) => S.sel.has(m.name)); }
+  const online = list.filter((m) => m.online || m.self).length;
+  $("rowCount").textContent = list.length ? `${online} of ${list.length} shown are up` : "";
+  renderBulk();
+  renderKpis();
+  renderAlerts();
+}
+function renderBulk() {
+  for (const n of [...S.sel]) if (!byName(n)) S.sel.delete(n);
+  $("bulk").hidden = S.sel.size === 0;
+  $("bulkN").textContent = `${S.sel.size} selected`;
+}
+function renderKpis() {
+  const st = S.st; if (!st) return;
+  const peers = st.peers || [];
+  const on = peers.filter((p) => p.online);
+  const direct = on.filter((p) => p.path === "direct").length, relay = on.filter((p) => p.path === "relay").length;
+  const alerts = st.alerts || [];
+  const crit = alerts.some((a) => a.level === "critical");
+  const k = (cls, label, value, detail) => `<div class="kpi ${cls}"><div class="k">${label}</div><div class="v">${value}</div><div class="d">${detail}</div></div>`;
+  $("kpis").innerHTML =
+    k("", "Machines", `${on.length + (st.running ? 1 : 0)} <small>of ${peers.length + 1} online</small>`, peers.length ? `${peers.length - on.length} offline` : "only this one so far") +
+    k(on.length && relay === 0 ? "good" : relay ? "warn" : "", "Connections", on.length ? `${direct} <small>direct</small>` : "—",
+      on.length ? (relay ? `${relay} through the hub's relay` : "all peer to peer") : "no peer online") +
+    k(st.running ? "" : "bad", "This machine", esc(st.ip || "—"), st.running ? `tunnel up · ${esc(st.name || "")}` : "tunnel down") +
+    k(alerts.length ? (crit ? "bad" : "warn") : "good", "Health", alerts.length ? `${alerts.length} <small>alert${alerts.length > 1 ? "s" : ""}</small>` : "Good",
+      alerts.length ? esc(alerts[0].message) : "no disk, load or contact problems");
+}
+let alertsOpen = false;
+function renderAlerts() {
+  const st = S.st; if (!st) return;
+  const items = [];
+  if (st.last_error) items.push({level: "critical", message: st.last_error});
+  for (const c of st.conflicts || []) items.push({level: "warn", message: c});
+  for (const a of st.alerts || []) items.push(a);
+  if (!items.length) { $("alerts").innerHTML = ""; return; }
+  const crit = items.some((a) => a.level === "critical");
+  const shown = alertsOpen ? items : items.slice(0, 2);
+  $("alerts").innerHTML = `<div class="notice ${crit ? "bad" : "warn"}">${icon("alert")}<div class="body">
+    <b>${items.length === 1 ? "One thing needs attention" : items.length + " things need attention"}</b>
+    <ul>${shown.map((a) => `<li>${esc(a.message)}${a.kind === "offline" && a.node && st.is_admin ? ` — <a href="#network" data-net-focus="${esc(a.node)}">remove it?</a>` : ""}</li>`).join("")}</ul>
+    ${items.length > 2 ? `<a href="javascript:void 0" id="alertsMore">${alertsOpen ? "Show fewer" : `Show all ${items.length}`}</a>` : ""}</div></div>`;
+  const more = $("alertsMore"); if (more) more.onclick = () => { alertsOpen = !alertsOpen; renderAlerts(); };
+}
+
+$("mHead").addEventListener("click", (e) => {
+  if (e.target.id === "selAll") {
+    const peers = visible().filter((m) => !m.self);
+    if (e.target.checked) peers.forEach((m) => S.sel.add(m.name)); else peers.forEach((m) => S.sel.delete(m.name));
+    lastTableKey = ""; renderMachines(); return;
+  }
+  const th = e.target.closest("th.sortable"); if (!th) return;
+  S.sort = {key: th.dataset.key, dir: S.sort.key === th.dataset.key ? -S.sort.dir : 1};
+  lastTableKey = ""; renderMachines();
+});
+$("mRows").addEventListener("click", (e) => {
+  const cb = e.target.closest("input[data-sel]");
+  if (cb) { cb.checked ? S.sel.add(cb.dataset.sel) : S.sel.delete(cb.dataset.sel); lastTableKey = ""; renderMachines(); return; }
+  if (e.target.closest("[data-nocl]") || e.target.closest("[data-copy]")) return;
+  const tr = e.target.closest("tr[data-name]"); if (tr) openDetail(tr.dataset.name);
+});
+$("stateFilter").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  S.stateFilter = b.dataset.f;
+  for (const x of $("stateFilter").children) x.setAttribute("aria-pressed", String(x === b));
+  lastTableKey = ""; renderMachines();
+});
+$("q").addEventListener("input", (e) => { S.filter = e.target.value.trim().toLowerCase(); lastTableKey = ""; renderMachines(); });
+$("bulk").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-bulk]"); if (!b) return;
+  if (b.dataset.bulk === "clear") { S.sel.clear(); lastTableKey = ""; renderMachines(); return; }
+  if (b.dataset.bulk === "run") { S.runTargets = new Set(S.sel); go("run"); $("runCmd").focus(); return; }
+  if (b.dataset.bulk === "send" || b.dataset.bulk === "fetch") { go("files"); $("fmMany").focus(); return; }
+});
+
+/* --------------------------------------------------------------- detail */
+function openDetail(name) {
+  S.detail = name;
+  renderDetail();
+  $("drawer").classList.add("on"); $("scrim").classList.add("on");
+  $("drawer").setAttribute("aria-hidden", "false");
+  lastTableKey = ""; renderMachines();
+}
+function closeDetail() {
+  S.detail = null;
+  $("drawer").classList.remove("on"); $("scrim").classList.remove("on");
+  $("drawer").setAttribute("aria-hidden", "true");
+  lastTableKey = ""; if (S.st) renderMachines();
+}
+$("dClose").onclick = closeDetail; $("scrim").onclick = closeDetail;
+
+let lastDetailKey = "";
+function renderDetail(force) {
+  const m = S.detail && byName(S.detail);
+  if (!m) { if (S.detail) closeDetail(); return; }
+  const s = m.stats || {};
+  const sub = [osName(m.os), m.ip, m.self ? "" : m.online ? (m.path === "direct" ? `direct via ${m.addr || "?"}` : m.path === "relay" ? "through the hub's relay" : "connecting") : m.last_seen ? `last seen ${ago(m.last_seen)}` : "offline"].filter(Boolean).join(" · ");
+  const key = JSON.stringify(m) + S.accounts[m.name] + (S.st && S.st.is_admin);
+  if (!force && key === lastDetailKey) return;
+  lastDetailKey = key;
+  $("dName").innerHTML = `${esc(m.name)} ${statusPill(m)}${m.hub ? ' <span class="tag ok">hub</span>' : ""}`;
+  $("dSub").textContent = sub;
+
+  const has = (k) => !!svcFor(m, k);
+  const bad = (k) => { const x = svcFor(m, k); return !!(x && x.problem); };
+  const act = (a, label, ic, on, title, cls = "") => `<button class="btn ${cls}" data-act="${a}"${on ? "" : " disabled"} title="${esc(title)}">${icon(ic)}${label}</button>`;
+  let actions = "";
+  if (m.self) {
+    actions = `<div class="help">This is the computer you are using. Its settings — what it shares, whether others can run work on it — are on <a href="#this">This machine</a>.</div>`;
+  } else if (!m.online) {
+    const macs = (m.lan || []).filter((l) => l.mac).length;
+    actions = `<div class="actions">${act("wake", "Wake it up", "power", macs > 0, macs ? "Send a Wake-on-LAN packet from a machine on its network" : "It has never reported a network card address", "btn-primary wide")}</div>
+      <div class="help">${m.last_seen ? `Offline since ${esc(ago(m.last_seen))}. ` : ""}Waking needs Wake-on-LAN enabled in its firmware, and another machine of yours on the same network.</div>`;
+  } else {
+    actions = `<div class="actions">
+      ${act("ssh", "Terminal (SSH)", "term", true, "Open your terminal with a shell on it", "btn-primary wide")}
+      ${act("vnc", "Screen (VNC)" + (bad("vnc") ? " ⚠" : ""), "screen", has("vnc"), bad("vnc") ? "Will not work yet — click for why" : has("vnc") ? "Its desktop, in your VNC client" : "No VNC server found there — sudo locnet setup -install on it adds one", bad("vnc") ? "btn-warn" : "")}
+      ${act("rdp", "RDP" + (bad("rdp") ? " ⚠" : ""), "screen", has("rdp"), bad("rdp") ? "Will not work yet — click for why and how to fix it" : has("rdp") ? "Its desktop, in your RDP client" : "No RDP server there", bad("rdp") ? "btn-warn" : "")}
+      ${act("files", "Browse files", "files", true, "Open it in the file manager")}
+      ${act("web", "Web page", "globe", has("browser"), has("browser") ? "Open the page it serves" : "It serves no web page")}
+    </div>
+    <label class="field" style="margin-top:12px">Log in as <span class="hint">remembered for this machine</span>
+      <input type="text" id="dLogin" spellcheck="false" autocomplete="off" placeholder="${esc((S.info && S.info.user) || "your account there")}" value="${esc(S.accounts[m.name] || "")}"></label>`;
+  }
+
+  const res = (label, pct, val) => pct == null ? "" :
+    `<div class="res-row"><span class="lbl">${label}</span><span class="bar"><i class="${lvl(pct)}" style="width:${Math.min(100, Math.max(2, pct)).toFixed(0)}%"></i></span><span class="val">${esc(val)}</span></div>`;
+  const gpus = (s.gpus || []).map((g) => `${esc(g.name)}${g.mem_total_mb ? ` · ${gb(g.mem_free_mb)} free of ${gb(g.mem_total_mb)}` : ""}`).join("<br>");
+  const resources = (m.online || m.self) && s.cpus ? `<div class="sect"><h3>Resources</h3><div class="res">
+      ${res("CPU", cpuPct(s), `${(cpuPct(s) || 0).toFixed(0)}% of ${s.cpus} cores`)}
+      ${res("Memory", memPct(s), `${gb(s.mem_total_mb - s.mem_free_mb)} of ${gb(s.mem_total_mb)}`)}
+      ${res("Disk", diskPct(s), `${s.disk_free_gb} GB free of ${s.disk_total_gb}`)}
+    </div>${gpus || s.uptime_hours ? `<dl class="kv" style="margin-top:12px">${gpus ? `<dt>GPU</dt><dd>${gpus}</dd>` : ""}${s.uptime_hours ? `<dt>Up for</dt><dd>${s.uptime_hours >= 48 ? Math.floor(s.uptime_hours / 24) + " days" : s.uptime_hours + " hours"}</dd>` : ""}</dl>` : ""}</div>` : "";
+
+  const broken = (m.services || []).filter((x) => x.problem);
+  const services = (m.services || []).length ? `<div class="sect"><h3>Services found</h3><div class="tags">${m.services.map((x) =>
+      `<span class="tag${x.problem ? " warn" : x.verified ? " ok" : ""}" title="${esc(svcTitle(x))}">${esc(x.name)} :${x.port}${x.problem ? " ⚠" : x.verified ? " ✓" : ""}</span>`).join("")}</div>
+      ${broken.map((x) => `<div class="notice warn" style="margin-top:10px">${icon("alert")}<div class="body"><b>${esc(x.name.toUpperCase())} will not work yet.</b> ${esc(x.problem)}</div></div>`).join("")}</div>` : "";
+  const shares = !m.self && (m.shares || []).length ? `<div class="sect"><h3>Shared with you</h3><div class="list">${m.shares.map((x) =>
+      `<div class="li${x.kind === "files" ? " click" : ""}" data-share="${esc(x.name)}" data-kind="${esc(x.kind)}">${icon(x.kind === "files" ? "files" : "globe")}<div class="grow"><b style="font-weight:560">${esc(x.name)}</b><small>${x.kind === "files" ? (x.read_only ? "folder · read-only" : "folder · read-write")
+        : publishes(m, x) ? `${esc(x.description || "a service")} — the ${esc(CLIENT[publishes(m, x).name] === "vnc" ? "VNC" : publishes(m, x).name.toUpperCase())} button above opens it`
+        : `service on port ${x.port}, at ${esc(m.ip)}:${x.port}${x.description ? " — " + esc(x.description) : ""}`}</small></div>${x.kind === "files" ? '<span class="faint">Browse ›</span>' : ""}</div>`).join("")}</div></div>` : "";
+  const compute = !m.self && m.compute ? `<div class="sect"><h3>Compute</h3><div class="help">Runs jobs from this machine, up to ${m.compute.max_seconds}s each${m.compute.label ? ` — “${esc(m.compute.label)}”` : ""}. Use <a href="#run">Run</a> in Compute mode, or the <a href="#queue">Queue</a>.</div></div>` : "";
+  const facts = `<div class="sect"><h3>Details</h3><dl class="kv">
+      <dt>Address</dt><dd><span class="copyable mono" data-copy="${esc(m.ip)}" title="Copy">${esc(m.ip)}</span></dd>
+      ${!m.self && m.online && m.addr ? `<dt>Path</dt><dd>${esc(m.path)} via <span class="mono">${esc(m.addr)}</span>${m.latency ? " · " + esc(m.latency) : ""}</dd>` : ""}
+      <dt>System</dt><dd>${esc(osName(m.os))}</dd>
+      ${(m.groups || []).length ? `<dt>Groups</dt><dd>${m.groups.map(esc).join(", ")}</dd>` : ""}
+      ${m.restricted ? "<dt>Access</dt><dd>limited to certain ports by policy</dd>" : ""}
+      ${(m.lan || []).length ? `<dt>Networks</dt><dd>${m.lan.flatMap((l) => l.nets || []).map(esc).join(", ") || "—"}</dd>` : ""}
+    </dl></div>`;
+  const danger = !m.self && !m.hub && S.st && S.st.is_admin ? `<div class="sect"><h3>Administration</h3>
+      <button class="btn btn-danger" data-act="remove">${icon("trash")}Remove from the network</button></div>` : "";
+
+  $("dBody").innerHTML = `<div class="sect">${actions}</div>${resources}${services}${shares}${compute}${facts}${danger}`;
+}
+$("dBody").addEventListener("click", async (e) => {
+  const m = S.detail && byName(S.detail); if (!m) return;
+  const sh = e.target.closest("[data-share]");
+  if (sh && sh.dataset.kind === "files") { browseShare(m, sh.dataset.share); return; }
+  const b = e.target.closest("button[data-act]"); if (!b || b.disabled) return;
+  const a = b.dataset.act;
+  if (a === "files") { closeDetail(); go("files"); fmSetPeer(m.name); return; }
+  if (a === "wake") return wakeMachine(m);
+  if (a === "remove") return removeMachine(m.name);
+  return launch(m, a);
+});
+$("dBody").addEventListener("change", async (e) => {
+  if (e.target.id !== "dLogin") return;
+  const m = S.detail && byName(S.detail); if (!m) return;
+  const user = e.target.value.trim();
+  try {
+    await post("/api/account", {peer: m.name, user});
+    if (user) S.accounts[m.name] = user; else delete S.accounts[m.name];
+    toast(user ? `${m.name}: will log in as ${user}.` : `${m.name}: forgot the saved account.`, "ok", 2500);
+  } catch (err) { toast(err.message, "bad"); }
+});
+$("dBody").addEventListener("keydown", (e) => { if (e.target.id === "dLogin" && e.key === "Enter") e.target.blur(); });
+
+async function launch(m, act) {
+  const kind = act === "web" ? "browser" : act;
+  const svc = svcFor(m, kind);
+  log(`Opening ${act.toUpperCase()} on ${m.name}…`);
+  try {
+    const r = await post("/api/launch", {peer: m.name, host: m.ip, kind, port: svc ? svc.port : 22});
+    log(`Opened ${r.launched}`, "g");
+    if (kind === "vnc") {
+      toast(`Opened your VNC client for ${m.name}.\nIf its desktop is locked, unlock it with your password on ${m.name}. A window that stays black wakes up when you click inside it.`, "ok", 10000);
+    } else {
+      toast(`Opened ${act === "ssh" ? "a terminal" : act === "web" ? "the page" : "your " + act.toUpperCase() + " client"} for ${m.name}.`, "ok", 2600);
+    }
+  } catch (err) {
+    log(`${m.name}: ${err.message}`, "e");
+    if (err.message.length < 120 && !err.message.includes("locnet setup")) { toast(err.message, "bad"); return; }
+    remoteDesktopProblem(m, act, err.message);
+  }
+}
+
+/* A remote-desktop server that will refuse the login gets an explanation and a
+   way to fix it, rather than a client that flashes and vanishes. The fix has to
+   run on that machine, so the dialog offers a terminal there. */
+async function remoteDesktopProblem(m, act, message) {
+  const fix = message.includes("locnet setup rdp") ? "locnet setup rdp" : "";
+  const body = document.createElement("div"); body.className = "stack";
+  const p = document.createElement("div"); p.className = "help"; p.style.cssText = "font-size:13px; color:var(--text); white-space:pre-line";
+  let text = message.replace(/^[^:]+: /, "");
+  if (fix) text = text.replace(/\s*Fix it on that machine.*$/s, "");
+  p.textContent = text.charAt(0).toUpperCase() + text.slice(1);
+  body.appendChild(p);
+  if (fix) {
+    const steps = document.createElement("div"); steps.className = "help";
+    steps.innerHTML = `On <b>${esc(m.name)}</b>, as the person who logs in there and without sudo, run:
+      <div class="codebox" style="margin-top:6px"><code>${fix}</code><button class="btn btn-sm" data-copy="${fix}">${icon("copy")}Copy</button></div>
+      It asks you to choose a username and password for RDP, then checks it works. Use those to log in here; Remmina offers to remember them.`;
+    body.appendChild(steps);
+  }
+  const choice = await dialog({title: `${act.toUpperCase()} to ${m.name} will not work yet`, body, wide: true,
+    actions: [{label: "Close", value: "", cls: "btn-ghost"}].concat(fix ? [{label: `Open a terminal on ${m.name}`, value: "ssh", cls: "btn-primary"}] : [])});
+  if (choice === "ssh") launch(m, "ssh");
+}
+async function wakeMachine(m) {
+  try { const r = await post("/api/wake", {peer: m.name}); log(r.message, "g"); toast(r.message, "ok", 7000); }
+  catch (err) { log(err.message, "e"); toast(err.message, "bad"); }
+}
+
+/* shares browser */
+let BROWSE = null;
+function browseShare(m, share) {
+  BROWSE = {ip: m.ip, name: m.name, share, path: ""};
+  const box = document.createElement("div"); box.id = "brBox";
+  dialog({title: `${m.name} · ${share}`, body: box, wide: true});
+  browseLoad();
+}
+async function browseLoad() {
+  const box = $("brBox"); if (!box || !BROWSE) return;
+  const parts = BROWSE.path ? BROWSE.path.split("/") : [];
+  let acc = "", crumbs = `<a href="javascript:void 0" data-go="">${esc(BROWSE.share)}</a>`;
+  for (const p of parts) { acc = acc ? acc + "/" + p : p; crumbs += ` / <a href="javascript:void 0" data-go="${esc(acc)}">${esc(p)}</a>`; }
+  box.innerHTML = `<div class="help" style="margin-bottom:8px">${crumbs}</div><div class="list"><div class="li"><span class="spin"></span> Loading…</div></div>`;
+  try {
+    const q = new URLSearchParams({peer: BROWSE.ip, share: BROWSE.share, path: BROWSE.path});
+    const entries = await api("/api/files?" + q);
+    const rows = (BROWSE.path ? [`<div class="li click" data-up="1">${icon("up")}<div class="grow">..</div></div>`] : []).concat(
+      (entries || []).map((e) => `<div class="li click" data-name="${esc(e.name)}" data-dir="${e.is_dir}">${icon(e.is_dir ? "files" : "file")}<div class="grow">${esc(e.name)}</div><span class="faint num" style="font-size:12px">${e.is_dir ? "" : bytes(e.size)}</span>${e.is_dir ? "" : '<span class="faint" style="font-size:12px">Download</span>'}</div>`));
+    box.innerHTML = `<div class="help" style="margin-bottom:8px">${crumbs}</div><div class="list">${rows.join("") || '<div class="li faint">Empty.</div>'}</div>
+      <div class="help" style="margin-top:8px">Files are saved to ${esc(S.info.downloads || "your Downloads folder")}.</div>`;
+  } catch (err) { box.innerHTML = `<div class="notice bad">${icon("alert")}<div class="body">${esc(err.message)}</div></div>`; }
+}
+$("dlgB").addEventListener("click", async (e) => {
+  if (!BROWSE || !$("brBox")) return;
+  const c = e.target.closest("a[data-go]"); if (c) { BROWSE.path = c.dataset.go; return browseLoad(); }
+  const r = e.target.closest(".li"); if (!r) return;
+  if (r.dataset.up) { BROWSE.path = BROWSE.path.split("/").slice(0, -1).join("/"); return browseLoad(); }
+  const name = r.dataset.name; if (!name) return;
+  if (r.dataset.dir === "true") { BROWSE.path = BROWSE.path ? BROWSE.path + "/" + name : name; return browseLoad(); }
+  log(`Downloading ${name} from ${BROWSE.name}…`); toast(`Downloading ${name}…`, "", 2000);
+  try {
+    const out = await post("/api/download", {peer: BROWSE.ip, share: BROWSE.share, path: BROWSE.path ? BROWSE.path + "/" + name : name});
+    log(`Saved ${out.saved}`, "g"); toast(`Saved to ${out.saved}`, "ok", 6000);
+  } catch (err) { log(err.message, "e"); toast(err.message, "bad"); }
+});
+
+/* ------------------------------------------------------------------ run */
+const RUN_HELP = {
+  ssh: `Runs in your own shell on each machine, over SSH, all at once — pipes, <span class="inline-code">sudo</span> and quoting work as usual.
+        It needs an account there; set it in the machine's details, and <span class="inline-code">locnet ssh-keys</span> removes the password prompts.`,
+  compute: `Runs on machines that offer compute to this one, with no shell and no account: the words are run exactly as typed,
+        under the account their owner chose. Machines that do not accept work from here are greyed out.`,
+};
+function renderRunTargets() {
+  const box = $("runTargets");
+  const peers = (S.st && S.st.peers) || [];
+  if (!peers.length) { box.innerHTML = '<span class="faint">No other machines on this network yet.</span>'; return; }
+  const compute = S.runMode === "compute";
+  box.innerHTML = peers.map((p) => {
+    const usable = p.online && (!compute || p.compute);
+    if (!usable) S.runTargets.delete(p.name);
+    return `<label class="${usable ? "" : "off"}" title="${!p.online ? "offline" : compute && !p.compute ? "does not accept work from this machine" : ""}">
+      <input type="checkbox" value="${esc(p.name)}"${S.runTargets.has(p.name) ? " checked" : ""}${usable ? "" : " disabled"}>${esc(p.name)}</label>`;
+  }).join("");
+  $("runHelp").innerHTML = RUN_HELP[S.runMode];
+  $("runCmd").placeholder = compute ? "nproc" : "uptime";
+}
+$("runTargets").addEventListener("change", (e) => { const c = e.target; if (c.checked) S.runTargets.add(c.value); else S.runTargets.delete(c.value); });
+$("pickAll").onclick = () => { for (const p of (S.st && S.st.peers) || []) if (p.online && (S.runMode !== "compute" || p.compute)) S.runTargets.add(p.name); renderRunTargets(); };
+$("pickNone").onclick = () => { S.runTargets.clear(); renderRunTargets(); };
+$("runMode").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  S.runMode = b.dataset.mode;
+  for (const x of $("runMode").children) x.setAttribute("aria-pressed", String(x === b));
+  renderRunTargets();
+});
+$("runCmd").addEventListener("keydown", (e) => { if (e.key === "Enter") runGo(); });
+$("runGo").onclick = runGo;
+
+let JOB = null;
+async function runGo() {
+  const cmd = $("runCmd").value.trim();
+  if (!cmd) { toast("Type a command first.", "warn"); $("runCmd").focus(); return; }
+  const targets = [...S.runTargets].filter((n) => byName(n));
+  if (!targets.length) { toast("Pick at least one machine.", "warn"); return; }
+  if (S.runMode === "ssh") return startJob("/api/exec", {peers: targets, command: cmd});
+  // Compute: one request per machine; there is no job to poll.
+  for (const name of targets) {
+    const p = byName(name);
+    log(`${name} $ ${cmd}`, "h");
+    try {
+      const r = await post("/api/run", {peer: p.ip, command: cmd.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g).map((w) => w.replace(/^(["'])(.*)\1$/, "$2"))});
+      if (r.stdout) logOut(name, r.stdout.replace(/\n$/, ""));
+      if (r.stderr) logOut(name, r.stderr.replace(/\n$/, ""), "e");
+      if (r.error) logOut(name, r.error, "e");
+      log(`${name}: exit ${r.exit_code} in ${(r.seconds || 0).toFixed(1)}s`, r.exit_code === 0 ? "g" : "e");
+    } catch (err) { log(`${name}: ${err.message}`, "e"); }
+  }
+}
+async function startJob(path, body, onDone) {
+  if (JOB) { toast("Something is already running — stop it first.", "warn"); return; }
+  try {
+    const r = await post(path, body);
+    JOB = r.job;
+    $("runStop").hidden = false; $("runGo").disabled = true; $("cRun").textContent = "●"; $("cRun").classList.add("hot");
+    pollJob(0, onDone);
+  } catch (err) { log(err.message, "e"); toast(err.message, "bad"); }
+}
+async function pollJob(since, onDone) {
+  if (!JOB) return;
+  try {
+    const r = await api(`/api/job?id=${encodeURIComponent(JOB)}&since=${since}`);
+    for (const l of r.lines) {
+      if (l.kind === "progress") { if (onDone && onDone.progress) onDone.progress(r.percent, l.text); continue; }
+      const cls = l.kind === "err" ? "e" : l.kind === "ok" ? "g" : l.kind === "head" ? "h" : "";
+      if (l.target) logOut(l.target, l.text, cls); else log(l.text, cls);
+    }
+    if (onDone && onDone.progress && r.percent >= 0) onDone.progress(r.percent);
+    if (r.done) { endJob(r.summary, /failed/.test(r.summary || "") ? "e" : "g"); if (onDone && onDone.done) onDone.done(r.summary); return; }
+    setTimeout(() => pollJob(r.next, onDone), 450);
+  } catch (err) { endJob(err.message, "e"); if (onDone && onDone.done) onDone.done(err.message, true); }
+}
+function endJob(msg, cls) {
+  JOB = null;
+  $("runStop").hidden = true; $("runGo").disabled = false; $("cRun").textContent = ""; $("cRun").classList.remove("hot");
+  if (msg) { log(msg, cls); if (S.page !== "run") toast(msg, cls === "e" ? "bad" : "ok"); }
+}
+$("runStop").onclick = async () => {
+  if (!JOB) return;
+  try { await post("/api/cancel", {job: JOB}); } catch (err) { log(err.message, "e"); }
+  endJob("Stopped.", "e");
+};
+
+/* ---------------------------------------------------------------- files */
+const FM = {L: {peer: ".", path: "", entries: [], sel: new Set(), anchor: null}, R: {peer: "", path: "", entries: [], sel: new Set(), anchor: null}, ready: false};
+function fmEnter() {
+  const peers = ((S.st && S.st.peers) || []).filter((p) => p.online);
+  const sel = $("fmPeer");
+  $("fmLName").textContent = (S.st && S.st.name) || "This computer";
+  if (!peers.length) {
+    sel.innerHTML = "<option>no machine online</option>"; sel.disabled = true;
+    $("fmRList").innerHTML = '<div class="empty"><b>No other machine is online</b>Files can be copied once one is.</div>';
+  } else {
+    sel.disabled = false;
+    if (!FM.R.peer || !peers.some((p) => p.name === FM.R.peer)) FM.R.peer = peers[0].name;
+    sel.innerHTML = peers.map((p) => `<option value="${esc(p.name)}"${p.name === FM.R.peer ? " selected" : ""}>${esc(p.name)}</option>`).join("");
+  }
+  if (!FM.ready) { FM.ready = true; fmLoad("L"); if (peers.length) fmLoad("R"); }
+}
+function fmSetPeer(name) { FM.R.peer = name; FM.R.path = ""; fmEnter(); $("fmPeer").value = name; fmLoad("R"); }
+async function fmLoad(side) {
+  const st = FM[side];
+  const list = $(side === "L" ? "fmLList" : "fmRList");
+  list.innerHTML = '<div class="empty"><span class="spin"></span></div>';
+  try {
+    const r = await api(`/api/browse?peer=${encodeURIComponent(st.peer)}&path=${encodeURIComponent(st.path)}`);
+    st.path = r.path; st.parent = r.parent; st.entries = r.entries || []; st.sel.clear(); st.anchor = null;
+    $(side === "L" ? "fmLPath" : "fmRPath").value = r.path;
+    // A transfer's result stays up until the next click; reloading the panes
+    // to show what arrived must not wipe the message saying it arrived.
+    fmRender(side); if (!FM.sticky) fmStatus();
+  } catch (e) {
+    list.innerHTML = `<div class="empty"><b>Could not open this folder</b>${esc(e.message)}</div>`;
+  }
+}
+function fmRender(side) {
+  const st = FM[side];
+  const el = $(side === "L" ? "fmLList" : "fmRList");
+  if (!st.entries.length) { el.innerHTML = '<div class="empty">This folder is empty.</div>'; return; }
+  el.innerHTML = st.entries.map((e, i) => `<div class="fm-row${e.is_dir ? " dir" : ""}${st.sel.has(i) ? " on" : ""}" data-i="${i}" title="${esc(e.name)}">
+    <span class="ic">${icon(e.is_dir ? "files" : "file")}</span><span class="nm">${esc(e.name)}${e.link ? " ↗" : ""}</span>
+    <span class="sz">${e.is_dir ? "" : bytes(e.size)}</span><span class="dt">${when(e.mod)}</span></div>`).join("");
+}
+function fmBind(side) {
+  const el = $(side === "L" ? "fmLList" : "fmRList");
+  el.addEventListener("click", (ev) => {
+    const row = ev.target.closest(".fm-row"); if (!row) return;
+    const i = +row.dataset.i, st = FM[side];
+    FM.sticky = false;
+    if (ev.shiftKey && st.anchor != null) {
+      const [a, b] = st.anchor < i ? [st.anchor, i] : [i, st.anchor];
+      for (let k = a; k <= b; k++) { st.sel.add(k); const r = el.querySelector(`.fm-row[data-i="${k}"]`); if (r) r.classList.add("on"); }
+    } else {
+      st.anchor = i;
+      if (st.sel.has(i)) { st.sel.delete(i); row.classList.remove("on"); } else { st.sel.add(i); row.classList.add("on"); }
+    }
+    fmStatus();
+  });
+  el.addEventListener("dblclick", (ev) => {
+    const row = ev.target.closest(".fm-row"); if (!row) return;
+    const st = FM[side], e = st.entries[+row.dataset.i];
+    if (!e || !e.is_dir) return;
+    st.path = st.path.replace(/\/$/, "") + "/" + e.name; fmLoad(side);
+  });
+  $(side === "L" ? "fmLUp" : "fmRUp").onclick = () => { const st = FM[side]; if (st.parent) { st.path = st.parent; fmLoad(side); } };
+  $(side === "L" ? "fmLRe" : "fmRRe").onclick = () => fmLoad(side);
+  const p = $(side === "L" ? "fmLPath" : "fmRPath");
+  p.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { FM[side].path = p.value.trim(); fmLoad(side); } });
+}
+fmBind("L"); fmBind("R");
+$("fmPeer").onchange = (e) => { FM.R.peer = e.target.value; FM.R.path = ""; fmLoad("R"); };
+const fmPicked = (side) => [...FM[side].sel].map((i) => FM[side].path.replace(/\/$/, "") + "/" + FM[side].entries[i].name);
+function fmStatus(msg, cls) {
+  const el = $("fmStatus");
+  FM.sticky = !!msg;
+  el.className = "fm-status" + (cls ? " " + cls : "");
+  if (msg) { el.textContent = msg; return; }
+  const l = FM.L.sel.size, r = FM.R.sel.size;
+  el.textContent = l || r ? `${l} selected here, ${r} on ${FM.R.peer}.` :
+    "Click files to select them, double-click a folder to open it. Transfers use SSH (rsync where available), so you need an account on the other machine.";
+}
+function fmProgress(pct) { $("fmBar").hidden = false; $("fmFill").style.width = Math.max(2, pct) + "%"; }
+function fmTransfer(path, body, what) {
+  fmStatus(what + "…"); fmProgress(2);
+  startJob(path, body, {
+    progress: (pct) => { if (pct >= 0) fmProgress(pct); },
+    done: (summary, failed) => {
+      failed = failed || /failed/.test(summary || "");
+      fmStatus(`${what}: ${summary}`, failed ? "err" : "ok"); fmProgress(100);
+      setTimeout(() => { $("fmBar").hidden = true; $("fmFill").style.width = "0"; }, 900);
+      fmLoad("L"); fmLoad("R");
+    },
+  });
+}
+$("fmSend").onclick = () => {
+  const src = fmPicked("L");
+  if (!src.length) { fmStatus("Select something on the left first.", "err"); return; }
+  fmTransfer("/api/copy", {peers: [FM.R.peer], sources: src, dest: FM.R.path}, `Sending ${src.length} item(s) to ${FM.R.peer}`);
+};
+$("fmFetch").onclick = async () => {
+  const picked = fmPicked("R");
+  if (!picked.length) { fmStatus("Select something on the right first.", "err"); return; }
+  // One path per fetch, so several selections are several jobs, one after another.
+  for (const p of picked) {
+    await new Promise((done) => {
+      fmStatus(`Fetching ${p}…`); fmProgress(2);
+      startJob("/api/fetch", {peers: [FM.R.peer], path: p, into: FM.L.path}, {
+        progress: (pct) => { if (pct >= 0) fmProgress(pct); },
+        done: (summary, failed) => { fmStatus(`Fetch: ${summary}`, failed || /failed/.test(summary || "") ? "err" : "ok"); done(); },
+      });
+      if (!JOB) done();
+    });
+  }
+  $("fmBar").hidden = true; fmLoad("L");
+};
+function manyTargets() {
+  const names = [...S.sel].filter((n) => { const m = byName(n); return m && m.online && !m.self; });
+  return names.length ? names : (FM.R.peer ? [FM.R.peer] : []);
+}
+$("fmManySend").onclick = () => {
+  const p = $("fmMany").value.trim(); if (!p) { toast("Type a path first.", "warn"); return; }
+  const peers = manyTargets(); if (!peers.length) { toast("No machine to send to.", "warn"); return; }
+  fmTransfer("/api/copy", {peers, sources: [p], dest: ""}, `Sending ${p} to ${peers.join(", ")}`);
+};
+$("fmManyFetch").onclick = () => {
+  const p = $("fmMany").value.trim(); if (!p) { toast("Type a path first.", "warn"); return; }
+  const peers = manyTargets(); if (!peers.length) { toast("No machine to collect from.", "warn"); return; }
+  fmTransfer("/api/fetch", {peers, path: p, into: FM.L.path}, `Collecting ${p} from ${peers.join(", ")} into ${FM.L.path}`);
+};
+
+/* ---------------------------------------------------------------- queue */
+const isDone = (j) => j.state === "done" || j.state === "failed" || j.state === "cancelled";
+function queuePill(j) {
+  const cls = {queued: "idle", running: "info", done: "ok", failed: "bad", cancelled: "warn"}[j.state] || "idle";
+  return `<span class="pill ${cls}">${esc(j.state === "failed" && j.exit_code ? `failed (${j.exit_code})` : j.state)}</span>`;
+}
+function waiting(j) {
+  if (j.node) return esc(j.node);
+  if (j.state !== "queued") return "—";
+  if (j.on) return `waiting for ${esc(j.on)}`;
+  if (j.need && (j.need.gpu || j.need.vram_mb)) return "waiting for a GPU";
+  if (j.need && j.need.cpus) return `waiting for ${j.need.cpus} cores`;
+  return "waiting";
+}
+async function queueRefresh() {
+  let jobs;
+  try { jobs = await api("/api/queue"); }
+  catch (err) { $("qRows").innerHTML = `<tr><td colspan="6"><div class="empty"><b>Could not reach the queue</b>${esc(err.message)}</div></td></tr>`; return; }
+  S.queue = jobs || [];
+  const open = S.queue.filter((j) => !isDone(j)).length;
+  $("cQueue").textContent = open ? String(open) : ""; $("cQueue").classList.toggle("hot", open > 0);
+  if (S.page !== "queue") return;
+  $("qCount").textContent = `${open} waiting or running`;
+  const rows = S.queue.filter((j) => $("qAll").checked || !isDone(j));
+  $("qRows").innerHTML = rows.length ? rows.map((j) => `<tr>
+    <td class="mono">${esc(j.id)}</td><td>${queuePill(j)}</td><td class="hide-s" style="white-space:nowrap">${waiting(j)}</td><td class="hide-m faint">${esc(j.submitter || "")}</td>
+    <td class="mono" style="max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${esc((j.command || []).join(" "))}">${j.label ? `<b style="font-family:inherit">${esc(j.label)}:</b> ` : ""}${esc((j.command || []).join(" "))}</td>
+    <td class="r">${isDone(j) ? `<button class="btn btn-sm" data-out="${esc(j.id)}">Output</button>` : `<button class="btn btn-sm btn-danger" data-cancel="${esc(j.id)}">Cancel</button>`}</td></tr>`).join("")
+    : `<tr><td colspan="6"><div class="empty"><b>Nothing ${$("qAll").checked ? "in the queue" : "waiting"}</b>Queue something on the left, or from a terminal: <span class="inline-code">locnet queue submit -cpus 8 -- make -j8</span></div></td></tr>`;
+  renderWorkers();
+}
+function renderWorkers() {
+  const st = S.st; if (!st) return;
+  const rows = [];
+  if (st.compute && st.compute.enabled) rows.push({name: st.name + " (this one)", online: st.running, stats: st.stats, label: "allows " + (st.compute.allow || []).join(", ")});
+  for (const p of st.peers || []) if (p.compute) rows.push({name: p.name, online: p.online, stats: p.stats, label: p.compute.label || ""});
+  $("qWorkers").innerHTML = rows.length ? `<div class="list" style="border:0; border-radius:0">${rows.map((r) =>
+    `<div class="li">${icon("cpu")}<div class="grow"><b style="font-weight:560">${esc(r.name)}</b><small>${r.stats && r.stats.cpus ? `${r.stats.cpus} cores · ${gb(r.stats.mem_free_mb)} free` : ""}${r.label ? " · " + esc(r.label) : ""}</small></div>${r.online ? '<span class="pill ok">online</span>' : '<span class="pill bad">offline</span>'}</div>`).join("")}</div>`
+    : `<div class="empty"><b>No machine takes queued work yet</b>Switch on Compute under This machine, on each machine that should.</div>`;
+  const on = $("qOn"), cur = on.value;
+  on.innerHTML = '<option value="">any machine</option>' + machines().map((m) => `<option value="${esc(m.name)}">${esc(m.name)}</option>`).join("");
+  on.value = cur;
+}
+$("qAll").onchange = queueRefresh;
+$("qSubmit").onclick = async () => {
+  const raw = $("qCmd").value.trim();
+  if (!raw) { toast("Type a command to queue.", "warn"); $("qCmd").focus(); return; }
+  const job = {command: raw.split(/\s+/), need: {}};
+  const cpus = parseInt($("qCpus").value, 10), mem = parseFloat($("qMem").value);
+  const max = parseInt($("qMax").value, 10), prio = parseInt($("qPrio").value, 10);
+  const n = Math.max(1, Math.min(500, parseInt($("qN").value, 10) || 1));
+  if (cpus > 0) job.need.cpus = cpus;
+  if (mem > 0) job.need.mem_mb = Math.round(mem * 1024);
+  if ($("qGpu").checked) job.need.gpu = true;
+  if ($("qOn").value) job.on = $("qOn").value;
+  if (max > 0) job.max_seconds = max;
+  if (prio) job.priority = prio;
+  const ids = [];
+  try {
+    for (let i = 0; i < n; i++) {
+      if (n > 1) { job.index = i; job.count = n; }
+      const out = await post("/api/queue/submit", job);
+      ids.push(out.id);
+    }
+    toast(n === 1 ? `Queued ${ids[0]}.` : `Queued ${n} jobs.`, "ok");
+    log(`Queued ${ids.join(" ")}: ${raw}`, "g");
+    $("qCmd").value = "";
+    queueRefresh();
+  } catch (err) { toast(`Could not queue it: ${err.message}`, "bad"); }
+};
+$("qCmd").addEventListener("keydown", (e) => { if (e.key === "Enter") $("qSubmit").click(); });
+$("qRows").addEventListener("click", async (e) => {
+  const c = e.target.closest("[data-cancel]");
+  if (c) {
+    try { await post("/api/queue/cancel", {id: c.dataset.cancel}); toast(`Cancelled ${c.dataset.cancel}.`, "ok"); queueRefresh(); }
+    catch (err) { toast(err.message, "bad"); }
+    return;
+  }
+  const o = e.target.closest("[data-out]");
+  if (o) {
+    try {
+      const j = await api("/api/queue/job?id=" + encodeURIComponent(o.dataset.out));
+      const box = document.createElement("div"); box.className = "stack";
+      const meta = document.createElement("div"); meta.className = "help";
+      meta.textContent = `${(j.command || []).join(" ")} — ran on ${j.node || "?"} in ${(j.seconds || 0).toFixed(1)}s, exit ${j.exit_code || 0}${j.attempts > 1 ? `, attempt ${j.attempts} of ${j.max_attempts}` : ""}`;
+      box.appendChild(meta);
+      const add = (title, text, cls) => {
+        if (!text) return;
+        const h = document.createElement("div"); h.className = "sect"; h.innerHTML = `<h3>${title}</h3>`;
+        const t = document.createElement("div"); t.className = "term" + (cls ? " " + cls : ""); t.style.maxHeight = "44vh"; t.textContent = text;
+        h.appendChild(t); box.appendChild(h);
+      };
+      add("Problem", j.error); add("Output", j.stdout); add("Errors", j.stderr);
+      if (!j.error && !j.stdout && !j.stderr) { const p = document.createElement("div"); p.className = "faint"; p.textContent = "It printed nothing."; box.appendChild(p); }
+      dialog({title: `Job ${j.id}`, body: box, wide: true});
+    } catch (err) { toast(err.message, "bad"); }
+  }
+});
+
+/* --------------------------------------------------------- this machine */
+function renderThis(force) {
+  const st = S.st; if (!st) return;
+  if (S.page !== "this" && !force) return;
+  $("tunSw").checked = !!st.running;
+  $("tunLbl").textContent = st.running ? "Tunnel up" : "Tunnel down";
+  $("tunSw").disabled = !st.registered;
+  const kv = (k, v) => v ? `<dt>${k}</dt><dd>${v}</dd>` : "";
+  $("connKv").innerHTML = st.registered ? (
+    kv("Network", esc(st.network || "")) + kv("This machine", `${esc(st.name)} · <span class="copyable mono" data-copy="${esc(st.ip)}">${esc(st.ip)}</span>`) +
+    kv("Role", [st.is_hub ? "runs the hub" : "", st.is_admin ? "administers the network" : ""].filter(Boolean).join(", ") || "member") +
+    kv("Hub", `<span class="mono">${esc(st.hub_addr || "")}</span> ${st.hub_ok ? '<span class="pill ok">answering</span>' : '<span class="pill warn">waiting</span>'}`) +
+    kv("Interface", st.interface ? `${esc(st.interface)} · UDP ${st.listen_port}` : "—") +
+    kv("Seen as", st.observed ? `<span class="mono">${esc(st.observed)}</span>` : "—") +
+    kv("Relay", st.relay ? `<span class="mono">${esc(st.relay)}</span>` : "—") +
+    kv("Software", `locnetd ${esc(st.agent_version || "(older)")}${S.info.version ? ` · console ${esc(S.info.version)}` : ""}`)
+  ) : `<dt>Status</dt><dd>Not joined. Get a join code, then <span class="inline-code">sudo locnet join &lt;code&gt;</span></dd>`;
+
+  // Shares
+  const shares = st.shares || [];
+  $("shList").innerHTML = shares.length ? `<div class="list" style="border:0; border-radius:0">${shares.map((s) => `<div class="li">${icon(s.kind === "files" ? "files" : "globe")}
+      <div class="grow"><b style="font-weight:600">${esc(s.name)}</b> <span class="tag">${s.kind === "files" ? (s.read_only ? "read-only" : "read-write") : "port " + s.port}</span>
+      <small class="mono">${esc(s.target)}</small><small>${(s.allow || []).length ? "shared with " + (s.allow.includes("*") ? "every machine" : s.allow.map(esc).join(", ")) : "<b>nobody yet</b> — remove and re-add it with a list of machines"}${s.description ? " — " + esc(s.description) : ""}</small></div>
+      <button class="btn btn-sm btn-danger" data-unshare="${esc(s.name)}">Stop sharing</button></div>`).join("")}</div>`
+    : `<div class="empty"><b>Nothing is shared</b>Share a folder so others can browse and download from it without an account here, or publish a local service such as a database bound to 127.0.0.1.</div>`;
+
+  // Compute: refilled from the daemon unless somebody has started editing it,
+  // so a refresh every few seconds cannot undo a change before it is saved.
+  const c = st.compute || {};
+  if (force) S.cpDirty = false;
+  if (!S.cpDirty) {
+    $("cpOn").checked = !!c.enabled;
+    $("cpAllow").value = (c.allow || []).join(", ");
+    $("cpUser").value = c.run_as || (S.info.user || "");
+    $("cpMax").value = c.max_seconds || "";
+    $("cpLabel").value = c.label || "";
+  }
+  $("cpState").textContent = c.enabled ? `On — ${(c.allow || []).includes("*") ? "every machine" : (c.allow || []).join(", ")} may run work here as ${c.run_as || "the service account"}` : "Off — nothing runs here at anyone else's request";
+  $("hostsSw").checked = !!st.manage_hosts;
+
+  const d = st.desktop || {};
+  $("deskBox").innerHTML = d.enabled ? `<div class="notice warn">${icon("info")}<div class="body"><b>An old screen-sharing setting is still on.</b>
+      It offers this screen to ${esc((d.allow || []).join(", ") || "nobody")} over LocNet's own protocol, which no viewer uses any more.
+      Remote desktop now goes through RDP or VNC.<div style="margin-top:8px"><button class="btn btn-sm" id="deskStop">Turn it off</button></div></div></div>`
+    : `<div class="help">Remote desktop goes through the RDP or VNC server on each machine; <span class="inline-code">sudo locnet setup -install</span> puts one in place where there is none.</div>`;
+  const ds = $("deskStop");
+  if (ds) ds.onclick = async () => { try { await post("/api/desktop/stop"); toast("Screen sharing turned off.", "ok"); refresh(); } catch (err) { toast(err.message, "bad"); } };
+}
+$("tunSw").onchange = async (e) => {
+  const up = e.target.checked;
+  if (!up && !(await confirmBox("Take the tunnel down?", "Other machines will see this one as offline, and connections through LocNet will stop, until it is brought back up.", "Take it down", true))) { e.target.checked = true; return; }
+  try { await post("/api/tunnel", {up}); toast(up ? "Tunnel is up." : "Tunnel is down.", "ok"); refresh(); }
+  catch (err) { toast(err.message, "bad"); e.target.checked = !up; }
+};
+$("hostsSw").onchange = async (e) => {
+  try { await post("/api/hosts", {enabled: e.target.checked}); toast(e.target.checked ? "Peer names are now in the hosts file." : "Removed peer names from the hosts file.", "ok"); refresh(); }
+  catch (err) { toast(err.message, "bad"); e.target.checked = !e.target.checked; }
+};
+for (const id of ["cpOn", "cpAllow", "cpUser", "cpMax", "cpLabel"]) {
+  $(id).addEventListener("input", () => { S.cpDirty = true; });
+  $(id).addEventListener("change", () => { S.cpDirty = true; });
+}
+$("cpSave").onclick = async () => {
+  const allow = $("cpAllow").value.split(",").map((s) => s.trim()).filter(Boolean);
+  const cfg = {enabled: $("cpOn").checked, allow, run_as: $("cpUser").value.trim(), label: $("cpLabel").value.trim()};
+  const max = parseInt($("cpMax").value, 10); if (max > 0) cfg.max_seconds = max;
+  if (cfg.enabled && !allow.length) { toast("Say which machines may run work here.", "warn"); $("cpAllow").focus(); return; }
+  if (cfg.enabled && allow.includes("*") && !(await confirmBox("Let every machine run work here?",
+      `Any machine that joins this network will be able to run programs here as <b>${esc(cfg.run_as || "the service account")}</b>. Naming machines is safer.`, "Allow all"))) return;
+  try { await post("/api/compute", cfg); S.cpDirty = false; toast(cfg.enabled ? "Compute settings saved." : "Compute is off.", "ok"); refresh(); }
+  catch (err) { toast(err.message, "bad"); }
+};
+// Switching it off needs nothing else, so it takes effect at once; switching it
+// on waits for Save, because it needs a list of machines first.
+$("cpOn").addEventListener("change", () => { if (!$("cpOn").checked && S.st && S.st.compute && S.st.compute.enabled) $("cpSave").click(); });
+$("shList").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-unshare]"); if (!b) return;
+  if (!(await confirmBox(`Stop sharing ${b.dataset.unshare}?`, "Other machines lose access straight away. Nothing on this machine is deleted.", "Stop sharing", true))) return;
+  try { await post("/api/share/remove", {name: b.dataset.unshare}); toast("No longer shared.", "ok"); refresh(); }
+  catch (err) { toast(err.message, "bad"); }
+});
+$("shAddBtn").onclick = async () => {
+  const peers = ((S.st && S.st.peers) || []).map((p) => p.name);
+  const box = document.createElement("div"); box.className = "stack";
+  box.innerHTML = `<div class="seg" id="shKind"><button data-k="files" aria-pressed="true">A folder</button><button data-k="port" aria-pressed="false">A service (port)</button></div>
+    <label class="field">Name <span class="hint">what others see it as</span><input type="text" id="shName" spellcheck="false" placeholder="projects"></label>
+    <label class="field" id="shTargetL">Folder <span class="hint">full path on this machine</span><input type="text" id="shTarget" class="mono" spellcheck="false" placeholder="${esc((S.info.user ? "/home/" + S.info.user : "/home/you") + "/Projects")}"></label>
+    <div><div style="font-size:12px; font-weight:560; color:var(--muted); margin-bottom:6px">Shared with</div>
+      <div class="machinepick" id="shWho"><label><input type="checkbox" value="*">every machine</label>${peers.map((p) => `<label><input type="checkbox" value="${esc(p)}">${esc(p)}</label>`).join("")}</div></div>
+    <label class="check" id="shRwL"><input type="checkbox" id="shRw"> others may add files too (read-write)</label>
+    <label class="field">Description <span class="hint">optional</span><input type="text" id="shDesc"></label>`;
+  let kind = "files";
+  box.querySelector("#shKind").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return; kind = b.dataset.k;
+    for (const x of box.querySelectorAll("#shKind button")) x.setAttribute("aria-pressed", String(x === b));
+    box.querySelector("#shTargetL").firstChild.textContent = kind === "files" ? "Folder " : "Local port ";
+    box.querySelector("#shTargetL .hint").textContent = kind === "files" ? "full path on this machine" : "e.g. 5432, or 127.0.0.1:5432";
+    box.querySelector("#shTarget").placeholder = kind === "files" ? "/home/you/Projects" : "5432";
+    box.querySelector("#shRwL").hidden = kind !== "files";
+  });
+  const ok = await dialog({title: "Share something", body: box,
+    actions: [{label: "Cancel", value: false, cls: "btn-ghost"}, {label: "Share it", value: true, cls: "btn-primary"}]});
+  if (!ok) return;
+  const name = box.querySelector("#shName").value.trim(), target = box.querySelector("#shTarget").value.trim();
+  const allow = [...box.querySelectorAll("#shWho input:checked")].map((i) => i.value);
+  const share = {name, kind, target, allow: allow.includes("*") ? ["*"] : allow, read_only: !box.querySelector("#shRw").checked, description: box.querySelector("#shDesc").value.trim()};
+  if (kind === "port") {
+    const port = parseInt(target.split(":").pop(), 10);
+    if (!(port > 0 && port < 65536)) { toast("That is not a port number.", "bad"); return; }
+    share.port = port; share.target = target.includes(":") ? target : String(port); delete share.read_only;
+  }
+  if (!name || !target) { toast("A share needs a name and a " + (kind === "files" ? "folder." : "port."), "bad"); return; }
+  try { await post("/api/share/add", share); toast(`Sharing ${name}${share.allow.length ? "" : " — with nobody yet"}.`, share.allow.length ? "ok" : "warn"); refresh(); }
+  catch (err) { toast(err.message, "bad"); }
+};
+
+/* diagnostics */
+const chk = (level, title, detail) => `<div class="chk ${level}"><span class="ic">${icon(level === "ok" ? "check" : "bang")}</span><div><div>${esc(title)}</div>${detail ? `<small>${esc(detail)}</small>` : ""}</div></div>`;
+$("diagGo").onclick = async () => {
+  const out = $("diagOut"), b = $("diagGo");
+  b.disabled = true; out.innerHTML = '<div class="help"><span class="spin"></span>&nbsp; Testing every connection — this takes a few seconds…</div>';
+  try {
+    const r = await api("/api/diagnose");
+    let html = `<div class="checks">${(r.checks || []).map((c) => chk(c.level, c.title, c.detail)).join("")}</div>`;
+    if ((r.peers || []).length) {
+      html += `<div class="sect" style="margin-top:12px"><h3>Through the tunnel</h3><div class="checks">${r.peers.map((p) =>
+        chk(p.ok ? "ok" : "bad", p.ok ? `${p.name} answers (${p.ms.toFixed(0)} ms, ${p.path})` : `${p.name} does not answer`,
+            p.ok ? "" : `The path says “${p.path}”, but no traffic got through: ${p.error}. Check that machine runs this version and look at both logs.`)).join("")}</div></div>`;
+    } else html += '<div class="help" style="margin-top:10px">No other machine is online, so nothing could be tested through the tunnel.</div>';
+    if (r.inbound) {
+      const i = r.inbound;
+      html += `<div class="sect" style="margin-top:12px"><h3>From ${esc(i.from)}, back to this machine</h3>` + (i.error
+        ? `<div class="checks">${chk("warn", `Could not ask ${i.from}`, i.error)}</div>`
+        : `<div class="checks">${(i.ports || []).map((p) => chk(p.open ? "ok" : "bad", `${p.name} (port ${p.port}) ${p.open ? "is reachable" : "is blocked"}`,
+            p.open ? "" : "It answers here but not from there — that is a firewall on this machine. sudo locnet setup -install opens it.")).join("")}</div>`) + "</div>";
+    }
+    out.innerHTML = html;
+  } catch (err) { out.innerHTML = `<div class="checks">${chk("bad", "The checks could not run", err.message)}</div>`; }
+  b.disabled = false;
+};
+
+/* -------------------------------------------------------------- network */
+async function netEnter() {
+  const st = S.st; if (!st) return;
+  const admin = !!st.is_admin;
+  $("netLocked").hidden = admin; $("netOpen").hidden = !admin;
+  $("grantCmd").textContent = `sudo locnet-hub admins add ${st.name || "<this machine>"}`;
+  if (admin) netLoad();
+}
+async function netLoad() {
+  try {
+    const [nodes, invites, audit] = await Promise.all([post("/api/manage/nodes"), post("/api/manage/invites"), post("/api/manage/audit", {limit: 30})]);
+    S.admin = {nodes, invites, audit};
+    renderNetwork();
+    // Separately, so a hub too old to know about access does not take the
+    // rest of the page down with it.
+    try { S.access = await post("/api/manage/access"); }
+    catch (err) { S.access = {error: err.message}; }
+    renderAccess();
+    try { S.web = await post("/api/manage/webshare"); }
+    catch (err) { S.web = {error: err.message}; }
+    renderWeb();
+  } catch (err) {
+    $("netRows").innerHTML = `<tr><td colspan="6"><div class="empty"><b>The hub did not answer</b>${esc(err.message)}</div></td></tr>`;
+  }
+}
+function renderNetwork() {
+  const a = S.admin; if (!a) return;
+  const me = S.st && S.st.name;
+  $("netRows").innerHTML = (a.nodes || []).map((n) => {
+    const state = !n.approved ? '<span class="pill warn">waiting</span>' : n.online ? '<span class="pill ok">online</span>' : '<span class="pill bad">offline</span>';
+    const role = [n.hub ? '<span class="tag ok">hub</span>' : "", n.admin ? '<span class="tag accent">admin</span>' : "", n.name === me ? '<span class="tag">this one</span>' : ""].join(" ");
+    const acts = [!n.approved ? `<button class="btn btn-sm btn-primary" data-approve="${esc(n.name)}">Admit</button>` : "",
+                  // The hub's own machine is left to the hub: removing it from
+                  // here would cut the network's anchor off from its own map.
+                  n.name !== me && !n.hub ? `<button class="btn btn-sm btn-danger" data-remove="${esc(n.name)}">Remove</button>` : ""].join(" ");
+    return `<tr id="net-${esc(n.name)}"><td><div class="mname"><span class="os${n.online ? " on" : ""}">${icon("machines")}</span><div><b>${esc(n.name)} ${role}</b><small>${esc(osName(n.os))}</small></div></div></td>
+      <td>${state}</td><td class="hide-s mono">${esc(n.ip)}</td><td class="hide-m">${n.online ? "now" : esc(ago(n.last_seen))}</td>
+      <td class="hide-m faint">${esc(ago(n.created_at))}</td><td class="r" style="white-space:nowrap">${acts}</td></tr>`;
+  }).join("") || '<tr><td colspan="6"><div class="empty">No machines.</div></td></tr>';
+
+  const active = (a.invites || []).filter((i) => i.active);
+  $("invCount").textContent = active.length ? `${active.length} still work` : "none work right now";
+  $("invList").innerHTML = (a.invites || []).length ? `<div class="list" style="border:0; border-radius:0">${a.invites.slice(0, 12).map((i) => `<div class="li">
+      <span class="pill ${i.active ? "ok" : "idle"}">${i.active ? "works" : "spent"}</span>
+      <div class="grow"><b style="font-weight:560">${esc(i.label || "unlabelled")}</b><small>${esc(i.id)}… · made ${esc(ago(i.created_at))}${i.active ? ` · ${i.uses < 0 ? "any number of machines" : i.uses + " use" + (i.uses === 1 ? "" : "s") + " left"}${i.expires_at ? " · expires " + new Date(i.expires_at).toLocaleString([], {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"}) : ""}` : ""}</small></div>
+      ${i.active ? `<button class="btn btn-sm btn-ghost" data-revoke="${esc(i.id)}">Revoke</button>` : ""}</div>`).join("")}</div>`
+    : '<div class="empty">No join codes yet.</div>';
+
+  $("auditList").innerHTML = (a.audit || []).length ? `<div class="list" style="border:0; border-radius:0">${a.audit.map((e) => `<div class="li">
+      <div class="grow"><b style="font-weight:560">${esc(e.action.replace(".", " "))}</b> <span class="muted">${esc(e.detail || "")}</span><small>${esc(e.actor)} · ${esc(new Date(e.at).toLocaleString())}</small></div></div>`).join("")}</div>`
+    : '<div class="empty">Nothing has happened yet.</div>';
+}
+$("netRe").onclick = netLoad;
+$("netRows").addEventListener("click", async (e) => {
+  const ap = e.target.closest("[data-approve]");
+  if (ap) { try { await post("/api/manage/approve", {node: ap.dataset.approve}); toast(`${ap.dataset.approve} is now on the network.`, "ok"); netLoad(); refresh(); } catch (err) { toast(err.message, "bad"); } return; }
+  const rm = e.target.closest("[data-remove]");
+  if (rm) removeMachine(rm.dataset.remove);
+});
+async function removeMachine(name) {
+  const ok = await confirmBox(`Remove ${name} from the network?`,
+    `<b>${esc(name)}</b> loses its address and every connection to the other machines within seconds. It keeps nothing it could rejoin with — bringing it back takes a new join code.<br><br>Use this for a machine that was reset, sold or lost.`, "Remove " + name, true);
+  if (!ok) return;
+  try {
+    await post("/api/manage/remove", {node: name});
+    toast(`Removed ${name}.`, "ok"); log(`Removed ${name} from the network.`, "g");
+    if (S.detail === name) closeDetail();
+    S.sel.delete(name);
+    netLoad(); refresh();
+  } catch (err) { toast(err.message, "bad"); }
+}
+$("invList").addEventListener("click", async (e) => {
+  const r = e.target.closest("[data-revoke]"); if (!r) return;
+  try { await post("/api/manage/revoke", {id: r.dataset.revoke}); toast("That join code no longer works.", "ok"); netLoad(); } catch (err) { toast(err.message, "bad"); }
+});
+$("invGo").onclick = async () => {
+  const req = {label: $("invLabel").value.trim(), uses: parseInt($("invUses").value, 10), ttl: $("invTtl").value};
+  try {
+    const r = await post("/api/manage/invite", req);
+    $("invLabel").value = "";
+    const code = esc(r.code);
+    dialog({title: "Join code ready", wide: true, body: `
+      <div class="help" style="font-size:13px">Good for ${r.uses < 0 ? "any number of machines" : r.uses === 1 ? "one machine" : r.uses + " machines"}${r.expires_at ? ", until " + esc(new Date(r.expires_at).toLocaleString()) : ", with no expiry"}. Anyone holding it can join, so send it privately.</div>
+      <div class="codebox"><code id="jc">${code}</code><button class="btn btn-primary" data-copy="${code}">${icon("copy")}Copy</button></div>
+      <div class="sect"><h3>On the new machine</h3><div class="stack" style="gap:8px">
+        <div><div class="help">Linux or macOS, from an unpacked LocNet release — installs and joins in one step:</div>
+          <div class="codebox"><code>sudo ./install.sh --join ${code}</code><button class="btn btn-sm" data-copy="sudo ./install.sh --join ${code}">Copy</button></div></div>
+        <div><div class="help">Windows, in an administrator PowerShell, from the release folder:</div>
+          <div class="codebox"><code>.\\install.ps1 -Join ${code}</code><button class="btn btn-sm" data-copy=".\\install.ps1 -Join ${code}">Copy</button></div></div>
+        <div><div class="help">Where LocNet is already installed:</div>
+          <div class="codebox"><code>sudo locnet join ${code}</code><button class="btn btn-sm" data-copy="sudo locnet join ${code}">Copy</button></div></div>
+      </div></div>`});
+    netLoad();
+  } catch (err) { toast(err.message, "bad"); }
+};
+
+/* --------------------------------------------------------------- access */
+const accPair = (src, dst) => ((S.access && S.access.pairs) || []).find((p) => p.src === src && p.dst === dst);
+const accAllows = (p, port) => !!p && (p.all || (p.ports || []).some((r) => port >= r.lo && port <= r.hi));
+function renderAccess() {
+  const a = S.access, t = $("accTable");
+  if (!a) { t.innerHTML = ""; return; }
+  if (a.error) { t.innerHTML = `<tbody><tr><td><div class="empty"><b>The hub could not show access</b>${esc(a.error)}</div></td></tr></tbody>`; return; }
+  const ms = a.machines || [];
+  const head = `<thead><tr><th class="from">From ↓ · to →</th>${ms.map((m) => `<th>${esc(m)}</th>`).join("")}</tr></thead>`;
+  const rows = ms.map((src) => `<tr><td class="from">${esc(src)}</td>${ms.map((dst) => {
+    if (src === dst) return '<td class="cell faint">·</td>';
+    const p = accPair(src, dst) || {desc: "none"};
+    const kind = p.desc === "all" ? "ok" : p.desc === "none" ? "bad" : "warn";
+    return `<td class="cell"><button class="pill ${kind}" data-acc-src="${esc(src)}" data-acc-dst="${esc(dst)}"
+      title="What ${esc(src)} may open on ${esc(dst)}. Click to change.">${esc(p.desc)}</button></td>`;
+  }).join("")}</tr>`).join("");
+  t.innerHTML = head + `<tbody>${rows}</tbody>`;
+}
+$("accTable").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-acc-src]");
+  if (b) accessDialog(b.dataset.accSrc, b.dataset.accDst);
+});
+async function accessChange(action, src, dst, services) {
+  try {
+    S.access = await post("/api/manage/access", {action, src, dst, services});
+    renderAccess();
+    const what = services.length ? services.join(", ") : "every port";
+    const msg = action === "block" ? `${src} may no longer open ${what} on ${dst}.` : `${src} may now open ${what} on ${dst}.`;
+    toast(msg, "ok"); log(msg, "g");
+    // The change is in the hub's log now; show it there too.
+    post("/api/manage/audit", {limit: 30}).then((audit) => { if (S.admin) { S.admin.audit = audit; renderNetwork(); } }).catch(() => {});
+    return true;
+  } catch (err) { toast(err.message, "bad"); return false; }
+}
+function accessDialog(src, dst) {
+  const body = document.createElement("div");
+  body.className = "stack";
+  const draw = () => {
+    const p = accPair(src, dst);
+    body.innerHTML = `<div class="help" style="font-size:13px">What <b>${esc(src)}</b> may open on <b>${esc(dst)}</b> — now: <b>${esc(p ? p.desc : "none")}</b>.
+        ${esc(dst)} can still connect to ${esc(src)} whatever you choose here. Changes reach both machines within seconds and are kept in the hub's log.</div>
+      ${(S.access.services || []).map((s) => `<label class="switch" style="justify-content:space-between; width:100%">
+        <span><b style="font-weight:600">${esc(s.name)}</b> <span class="faint">port ${s.port} · ${esc(s.desc)}</span></span>
+        <input type="checkbox" data-svc="${esc(s.name)}"${accAllows(p, s.port) ? " checked" : ""}><span class="track"></span></label>`).join("")}
+      <div class="row end" style="gap:8px"><button class="btn btn-sm btn-danger" data-acc-all="block">Block everything</button>
+        <button class="btn btn-sm" data-acc-all="allow">Allow everything</button></div>`;
+  };
+  body.addEventListener("change", async (e) => {
+    const i = e.target.closest("[data-svc]"); if (!i) return;
+    i.disabled = true;
+    await accessChange(i.checked ? "allow" : "block", src, dst, [i.dataset.svc]);
+    draw();
+  });
+  body.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-acc-all]"); if (!b) return;
+    b.disabled = true;
+    await accessChange(b.dataset.accAll, src, dst, []);
+    draw();
+  });
+  draw();
+  dialog({title: `${src} → ${dst}`, body, actions: [{label: "Done", value: true, cls: "btn-primary"}]});
+}
+
+/* ------------------------------------------------------------- webshare */
+function renderWeb() {
+  const v = S.web; if (!v) return;
+  if (v.error) {
+    $("webHead").innerHTML = `<div class="empty"><b>The hub could not show WebShare</b>${esc(v.error)}</div>`;
+    $("webRows").innerHTML = ""; return;
+  }
+  const dns = !v.domain ? "" : !v.duckdns ? '<span class="pill idle">DNS not updated by the hub</span>'
+    : v.dns && v.dns.error ? `<span class="pill bad" title="${esc(v.dns.error)}">DNS update failing</span>`
+    : v.dns && v.dns.ip ? `<span class="pill ok">DNS → ${esc(v.dns.ip)}</span>` : '<span class="pill idle">DNS not checked yet</span>';
+  $("webHead").innerHTML = v.domain
+    ? `<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; flex-wrap:wrap">
+        <div style="min-width:0">Sites are <b class="mono">https://&lt;site&gt;.${esc(v.domain)}</b>
+        <div class="faint" style="font-size:12px; margin-top:2px">${v.dns && v.dns.error ? esc(v.dns.error) : "Each needs approval here before it answers; turning one off takes effect at once."}</div></div>${dns}</div>`
+    : `<div class="notice info" style="margin:12px"><svg><use href="#i-lock"/></svg><div class="body"><b>WebShare is off.</b>
+        Nothing listens on ports 80 or 443. To publish sites, on the hub machine run:
+        <div class="codebox" style="margin-top:8px"><code id="webCmd">sudo locnet-hub webshare domain yourname.duckdns.org -duckdns-token &lt;token&gt; -accept-tos</code><button class="btn btn-sm" data-copy-from="webCmd"><svg><use href="#i-copy"/></svg>Copy</button></div></div></div>`;
+  const kind = (st) => st === "live" ? "ok" : st === "waiting for approval" ? "warn" : st.startsWith("turned off") ? "idle" : "bad";
+  $("webRows").innerHTML = (v.sites || []).map((x) => {
+    const acts = [
+      x.state === "waiting for approval" ? `<button class="btn btn-sm btn-primary" data-web="approve" data-site="${esc(x.name)}" data-machine="${esc(x.machine)}">Approve</button>` : "",
+      x.state.startsWith("turned off") ? `<button class="btn btn-sm" data-web="on" data-site="${esc(x.name)}">Turn on</button>` : "",
+      x.live ? `<button class="btn btn-sm" data-web="off" data-site="${esc(x.name)}">Turn off</button>` : "",
+      x.state !== "waiting for approval" && x.state !== "name taken by another machine" ? `<button class="btn btn-sm btn-ghost" data-web="remove" data-site="${esc(x.name)}">Remove</button>` : "",
+    ].join(" ");
+    const link = x.live && x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener" class="mono">${esc(x.url.replace("https://", ""))}</a>` : `<span class="faint mono">${esc((x.url || "").replace("https://", "")) || "no address yet"}</span>`;
+    return `<tr><td><b>${esc(x.name)}</b><small style="display:block">${link}</small>${x.last_error ? `<small class="faint" style="display:block">last failure ${esc(x.last_error)}</small>` : ""}</td>
+      <td><span class="pill ${kind(x.state)}">${esc(x.state)}</span></td><td class="hide-s">${esc(x.machine)}</td>
+      <td class="hide-m mono">${esc(x.target || "-")}</td><td class="hide-m r">${x.requests || 0}</td><td class="r" style="white-space:nowrap">${acts}</td></tr>`;
+  }).join("") || `<tr><td colspan="6"><div class="empty">No site has been asked for.<br>On the machine serving it: <span class="mono">locnet webshare add &lt;site&gt; &lt;port&gt;</span></div></td></tr>`;
+}
+$("webRows").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-web]"); if (!b) return;
+  const action = b.dataset.web, name = b.dataset.site;
+  if (action === "approve" && !await confirmBox(`Publish ${name} to the internet?`,
+      `Anyone on the internet will be able to open <b>${esc(name)}</b>, served by <b>${esc(b.dataset.machine)}</b>, at its public address. Only that one web service is reachable, over HTTPS, and you can turn it off here at any time.`,
+      "Publish " + name)) return;
+  if (action === "remove" && !await confirmBox(`Forget ${name}?`,
+      `The approval is withdrawn and the site stops answering. If the machine still asks for it, it goes back to waiting for approval.`, "Forget " + name, true)) return;
+  b.disabled = true;
+  try {
+    S.web = await post("/api/manage/webshare", {action, name, machine: b.dataset.machine || ""});
+    renderWeb();
+    const msg = {approve: `${name} is approved.`, off: `${name} no longer answers.`, on: `${name} answers again.`, remove: `${name} was forgotten.`}[action];
+    toast(msg, "ok"); log(msg, "g");
+    post("/api/manage/audit", {limit: 30}).then((audit) => { if (S.admin) { S.admin.audit = audit; renderNetwork(); } }).catch(() => {});
+  } catch (err) { toast(err.message, "bad"); b.disabled = false; }
+});
+
+/* ----------------------------------------------------------------- docs */
+// The documentation compiled into this program, rendered here. The renderer
+// is small on purpose: it knows the markdown these documents use — headings,
+// paragraphs, lists, tables, code, links, emphasis — escapes everything, and
+// makes links between documents stay inside the console.
+const DOCS = {list: null, cache: {}, current: null, want: null};
+async function docsEnter() {
+  try {
+    if (!DOCS.list) DOCS.list = await api("/api/docs");
+  } catch (err) { $("docBody").innerHTML = `<div class="empty"><b>The documentation could not be loaded</b>${esc(err.message)}</div>`; return; }
+  const w = DOCS.want || {name: DOCS.current || "GUIDE"};
+  DOCS.want = null;
+  if (!$("docQ").value.trim()) renderDocList();
+  openDoc(w.name, w.anchor);
+}
+function renderDocList() {
+  $("docList").innerHTML = (DOCS.list || []).map((d) =>
+    `<a href="#docs:${esc(d.name)}" data-doc="${esc(d.name)}"${d.name === DOCS.current ? ' aria-current="page"' : ""}>${esc(d.title)}</a>`).join("");
+}
+async function docText(name) {
+  if (!(name in DOCS.cache)) DOCS.cache[name] = (await api("/api/docs/" + encodeURIComponent(name))).text;
+  return DOCS.cache[name];
+}
+async function openDoc(name, anchor) {
+  if (!(DOCS.list || []).some((d) => d.name === name)) name = "GUIDE";
+  let text;
+  try { text = await docText(name); }
+  catch (err) { $("docBody").innerHTML = `<div class="empty"><b>${esc(name)} could not be loaded</b>${esc(err.message)}</div>`; return; }
+  DOCS.current = name;
+  const {html, toc} = mdRender(text);
+  $("docBody").innerHTML = (toc.length > 2 ? `<nav class="toc" aria-label="On this page">${toc.map((t) => `<a href="#docs:${esc(name)}:${esc(t.id)}" data-anchor="${esc(t.id)}">${esc(t.text)}</a>`).join("")}</nav>` : "") + html;
+  for (const a of document.querySelectorAll("#docList a")) a.toggleAttribute("aria-current", a.dataset.doc === name && !a.dataset.anchor);
+  for (const a of document.querySelectorAll("#docList a[aria-current]")) a.setAttribute("aria-current", "page");
+  history.replaceState(null, "", location.pathname + location.search + "#docs:" + name + (anchor ? ":" + anchor : ""));
+  const target = anchor && document.getElementById("d-" + anchor);
+  if (target) target.scrollIntoView({block: "start"}); else $("content").scrollTop = 0;
+}
+
+// GitHub's heading anchors, so links written for GitHub work here too.
+function slug(text) {
+  return text.trim().toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, "").replace(/\s/g, "-");
+}
+function mdInline(src) {
+  const codes = [];
+  let s = src.replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return "\u0000" + (codes.length - 1) + "\u0000"; });
+  s = esc(s);
+  s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, t, u) => mdLink(t, u));
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[\s(—])\*([^*\s][^*]*?)\*(?=$|[\s).,;:—])/g, "$1<em>$2</em>");
+  return s.replace(/\u0000(\d+)\u0000/g, (m, i) => `<code>${esc(codes[+i])}</code>`);
+}
+function mdLink(text, href) {
+  const raw = href.replace(/&amp;/g, "&");
+  if (/^https?:\/\//.test(raw)) return `<a href="${esc(raw)}" target="_blank" rel="noopener">${text}</a>`;
+  if (raw.startsWith("#")) return `<a href="#docs:${esc(DOCS.current || "")}:${esc(raw.slice(1))}" data-anchor="${esc(raw.slice(1))}">${text}</a>`;
+  const m = raw.match(/(?:^|\/)([A-Za-z0-9_-]+)\.md(?:#(.*))?$/);
+  if (m && (DOCS.list || []).some((d) => d.name === m[1]))
+    return `<a href="#docs:${esc(m[1])}${m[2] ? ":" + esc(m[2]) : ""}" data-doc="${esc(m[1])}"${m[2] ? ` data-anchor="${esc(m[2])}"` : ""}>${text}</a>`;
+  return text; // a file outside these documents: say its name, link nowhere
+}
+function mdRender(text) {
+  const lines = text.replace(/\r/g, "").split("\n");
+  const out = [], toc = [], seen = {};
+  let i = 0;
+  const isBlockStart = (l) => /^(#{1,6} |```|\s*([-*]|\d+\.) |> |\|)/.test(l) || /^---+\s*$/.test(l);
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line.trim()) { i++; continue; }
+    let m;
+    if ((m = line.match(/^```(\S*)/))) {                      // fenced code
+      const body = [];
+      for (i++; i < lines.length && !/^```/.test(lines[i]); i++) body.push(lines[i]);
+      i++;
+      const code = body.join("\n");
+      out.push(`<pre><button class="btn btn-sm" data-copy="${esc(code)}">${icon("copy")}Copy</button><code>${esc(code)}</code></pre>`);
+      continue;
+    }
+    if ((m = line.match(/^(#{1,6}) +(.*)$/))) {                // heading
+      const level = m[1].length, plain = m[2].replace(/`/g, "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+      let id = slug(plain);
+      if (seen[id] !== undefined) id = id + "-" + (++seen[id]); else seen[id] = 0;
+      if (level === 2) toc.push({id, text: plain});
+      out.push(`<h${level} id="d-${esc(id)}">${mdInline(m[2])}</h${level}>`);
+      i++; continue;
+    }
+    if (/^---+\s*$/.test(line)) { out.push("<hr>"); i++; continue; }
+    if (line.startsWith("|") && i + 1 < lines.length && /^\|?\s*:?-{2,}/.test(lines[i + 1])) {   // table
+      const cells = (l) => l.trim().replace(/^\||\|$/g, "").replace(/\\\|/g, "\u0001").split("|").map((c) => mdInline(c.trim().replace(/\u0001/g, "|")));
+      const head = cells(line);
+      const rows = [];
+      for (i += 2; i < lines.length && lines[i].trim().startsWith("|"); i++) rows.push(cells(lines[i]));
+      out.push(`<table><thead><tr>${head.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
+      continue;
+    }
+    if (/^> ?/.test(line)) {                                    // quote
+      const body = [];
+      for (; i < lines.length && /^> ?/.test(lines[i]); i++) body.push(lines[i].replace(/^> ?/, ""));
+      out.push(`<blockquote>${mdRender(body.join("\n")).html}</blockquote>`);
+      continue;
+    }
+    if ((m = line.match(/^(\s*)([-*]|\d+\.) +/))) {             // list, one level of nesting
+      const ordered = /\d/.test(m[2]), base = m[1].length, items = [];
+      while (i < lines.length) {
+        const l = lines[i];
+        const im = l.match(/^(\s*)([-*]|\d+\.) +(.*)$/);
+        if (im && im[1].length <= base + 1) { items.push({text: im[3], sub: []}); i++; continue; }
+        if (im && im[1].length > base + 1 && items.length) { items[items.length - 1].sub.push(im[3]); i++; continue; }
+        if (l.trim() && /^\s+/.test(l) && items.length) {       // continuation
+          const it = items[items.length - 1];
+          if (it.sub.length) it.sub[it.sub.length - 1] += " " + l.trim(); else it.text += " " + l.trim();
+          i++; continue;
+        }
+        break;
+      }
+      const tag = ordered ? "ol" : "ul";
+      out.push(`<${tag}>${items.map((it) => `<li>${mdInline(it.text)}${it.sub.length ? `<ul>${it.sub.map((x) => `<li>${mdInline(x)}</li>`).join("")}</ul>` : ""}</li>`).join("")}</${tag}>`);
+      continue;
+    }
+    const para = [line.trim()];                                 // paragraph
+    for (i++; i < lines.length && lines[i].trim() && !isBlockStart(lines[i]); i++) para.push(lines[i].trim());
+    out.push(`<p>${mdInline(para.join(" "))}</p>`);
+  }
+  return {html: out.join("\n"), toc};
+}
+
+// Links inside the docs, and the list, stay in the console.
+document.addEventListener("click", (e) => {
+  const a = e.target.closest("#docBody a[data-doc], #docBody a[data-anchor], #docList a[data-doc]");
+  if (!a) return;
+  e.preventDefault();
+  const name = a.dataset.doc || DOCS.current;
+  if (a.closest("#docList") && $("docQ").value.trim() && !a.dataset.anchor) { $("docQ").value = ""; renderDocList(); }
+  openDoc(name, a.dataset.anchor);
+});
+
+// Search: every document, by section, every word must appear.
+let docSearchTimer = 0;
+$("docQ").addEventListener("input", () => { clearTimeout(docSearchTimer); docSearchTimer = setTimeout(docSearch, 150); });
+async function docSearch() {
+  const q = $("docQ").value.trim().toLowerCase();
+  if (!q) { renderDocList(); return; }
+  const words = q.split(/\s+/);
+  await Promise.all((DOCS.list || []).map((d) => docText(d.name).catch(() => "")));
+  const hits = [];
+  for (const d of DOCS.list || []) {
+    let section = {id: "", title: d.title, body: []};
+    const seen = {};
+    const flush = () => {
+      const text = section.body.join(" ");
+      const hay = (section.title + " " + text).toLowerCase();
+      if (words.every((w) => hay.includes(w))) {
+        const at = Math.max(0, text.toLowerCase().indexOf(words[0]) - 40);
+        hits.push({doc: d, id: section.id, title: section.title, snip: (at ? "…" : "") + text.slice(at, at + 130).replace(/[`*#|]/g, "") + "…",
+                   score: words.filter((w) => section.title.toLowerCase().includes(w)).length});
+      }
+    };
+    for (const line of DOCS.cache[d.name].split("\n")) {
+      const m = line.match(/^#{2,4} +(.*)$/);
+      if (m) {
+        flush();
+        const plain = m[1].replace(/`/g, "");
+        let id = slug(plain);
+        if (seen[id] !== undefined) id = id + "-" + (++seen[id]); else seen[id] = 0;
+        section = {id, title: plain, body: []};
+      } else section.body.push(line);
+    }
+    flush();
+  }
+  hits.sort((a, b) => b.score - a.score);
+  const mark = (s) => { let h = esc(s); for (const w of words) h = h.replace(new RegExp("(" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi"), "<mark>$1</mark>"); return h; };
+  $("docList").innerHTML = hits.length
+    ? hits.slice(0, 40).map((h) => `<a href="#docs:${esc(h.doc.name)}:${esc(h.id)}" data-doc="${esc(h.doc.name)}"${h.id ? ` data-anchor="${esc(h.id)}"` : ""}>${mark(h.title)}<small>${esc(h.doc.title)} · ${mark(h.snip)}</small></a>`).join("")
+    : `<div class="empty" style="padding:16px">Nothing matches “${esc(q)}”.</div>`;
+}
+
+/* ------------------------------------------------------------ shell bits */
+function renderShell() {
+  const st = S.st;
+  $("netName").textContent = !st ? "connecting…" : st.registered ? (st.network || "unnamed network") : "not joined";
+  const alerts = (st && st.alerts) || [];
+  let dot = "ok", title = "All healthy", sub = st ? `${((st.peers || []).filter((p) => p.online).length)} peer(s) online` : "";
+  if (!st) { dot = "bad"; title = "locnetd unreachable"; sub = "is the service running?"; }
+  else if (!st.registered) { dot = "warn"; title = "Not joined"; sub = "needs a join code"; }
+  else if (!st.running) { dot = "bad"; title = "Tunnel down"; sub = "others see this machine offline"; }
+  else if (st.last_error) { dot = "bad"; title = "Hub not answering"; sub = st.last_error.slice(0, 60); }
+  else if (alerts.length) { dot = alerts.some((a) => a.level === "critical") ? "bad" : "warn"; title = `${alerts.length} alert${alerts.length > 1 ? "s" : ""}`; sub = alerts[0].message.slice(0, 64); }
+  $("hDot").className = "hdot " + dot; $("hTitle").textContent = title; $("hSub").textContent = sub;
+  const peers = (st && st.peers) || [];
+  $("cMachines").textContent = st ? `${peers.filter((p) => p.online).length + (st.running ? 1 : 0)}/${peers.length + 1}` : "";
+  $("netLock").style.display = st && st.is_admin ? "none" : "";
+  $("pSub").textContent = PAGES[S.page][1]();
+}
+$("healthCard").onclick = () => { go("machines"); alertsOpen = true; renderAlerts(); };
+
+let failures = 0;
+async function refresh() {
+  try {
+    S.st = await api("/api/status");
+    failures = 0;
+  } catch (e) {
+    failures++;
+    if (failures === 1 || !S.st) { S.st = S.st && failures < 3 ? S.st : null; }
+    renderShell();
+    if (!S.st) {
+      $("kpis").innerHTML = "";
+      $("alerts").innerHTML = `<div class="notice bad">${icon("alert")}<div class="body"><b>locnetd is not answering</b><br>${esc(e.message)}<br>Start it with <span class="inline-code">sudo systemctl start locnetd</span>; this page reconnects by itself.</div></div>`;
+    }
+    return;
+  }
+  renderShell();
+  if (S.page === "machines" || S.detail) renderMachines();
+  if (S.detail) renderDetail();
+  if (S.page === "this") renderThis();
+  if (S.page === "queue") renderWorkers();
+  if (S.page === "run" && document.activeElement !== $("runCmd")) renderRunTargets();
+}
+
+/* Polling only while the page is being looked at: a console left open in a
+   background tab used to ask the daemon for its whole state every three
+   seconds, all day, for nobody. */
+let timer = null, qTimer = null;
+function schedule() {
+  clearInterval(timer); clearInterval(qTimer); timer = qTimer = null;
+  const on = S.live && document.visibilityState === "visible";
+  $("live").classList.toggle("on", on); $("live").classList.toggle("off", !S.live);
+  $("live").querySelector("span").textContent = S.live ? "Live" : "Paused";
+  if (!on) return;
+  timer = setInterval(refresh, 3000);
+  qTimer = setInterval(() => { if (S.page === "queue" || S.queue.some((j) => !isDone(j))) queueRefresh(); }, 5000);
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refresh(); schedule(); });
+$("live").onclick = () => { S.live = !S.live; if (S.live) refresh(); schedule(); };
+
+/* theme: system → light → dark → system */
+function themeIcon() {
+  const t = document.documentElement.getAttribute("data-theme");
+  $("btnTheme").innerHTML = icon(t === "dark" ? "moon" : t === "light" ? "sun" : "auto");
+  $("btnTheme").title = "Theme: " + (t === "dark" ? "dark" : t === "light" ? "light" : "follow the system");
+}
+$("btnTheme").onclick = () => {
+  const r = document.documentElement, t = r.getAttribute("data-theme");
+  const next = t === "light" ? "dark" : t === "dark" ? null : "light";
+  if (next) r.setAttribute("data-theme", next); else r.removeAttribute("data-theme");
+  try { if (next) localStorage.setItem("locnet-theme", next); else localStorage.removeItem("locnet-theme"); } catch (e) {}
+  themeIcon();
+};
+themeIcon();
+
+$("btnActivity").onclick = () => {
+  if (S.page === "run") return;
+  const on = !$("sheet").classList.contains("on");
+  $("sheet").classList.toggle("on", on);
+  if (on) { unread = 0; $("btnActivity").dataset.n = "0"; $("log").scrollTop = $("log").scrollHeight; }
+};
+$("sheetClose").onclick = () => $("sheet").classList.remove("on");
+
+$("btnHelp").onclick = () => dialog({title: "Using the console", wide: true, body: `<div class="help" style="font-size:13px; color:var(--text)">
+  <p><b>Machines</b> lists every machine on the network. Click one for its details and to connect: a terminal, its screen, its files.
+     Tick several to run one command on all of them or copy files to all of them.</p>
+  <p><b>Files</b> copies between this computer and another, over SSH. <b>Run</b> runs a command on many machines at once.
+     <b>Queue</b> holds jobs on the hub until a machine that fits is free.</p>
+  <p><b>This machine</b> is what this computer offers others, and a check that connections really work.
+     <b>Network</b> invites and removes machines, on a machine the hub lets do that.</p>
+  <p style="margin-top:14px"><b>Keys</b> &nbsp; <kbd>/</kbd> filter machines &nbsp; <kbd>Esc</kbd> close a panel &nbsp;
+     <kbd>g</kbd> then <kbd>m</kbd> <kbd>f</kbd> <kbd>r</kbd> <kbd>q</kbd> <kbd>t</kbd> <kbd>n</kbd> go to a page</p>
+  <p class="faint">This page is served only to this computer, with a key that changes every time <span class="inline-code">locnet console</span> starts.</p></div>`});
+
+let gPending = 0;
+document.addEventListener("keydown", (e) => {
+  const typing = e.target.closest && e.target.closest("input,textarea,select,[contenteditable]");
+  if (e.key === "Escape") {
+    if ($("dlg").open) return;
+    if ($("sheet").classList.contains("on")) { $("sheet").classList.remove("on"); return; }
+    if (S.detail) { closeDetail(); return; }
+    if (typing) e.target.blur();
+    return;
+  }
+  if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === "/") { e.preventDefault(); go("machines"); $("q").focus(); return; }
+  if (e.key === "g") { gPending = Date.now(); return; }
+  if (Date.now() - gPending < 1200) {
+    const page = {m: "machines", f: "files", r: "run", q: "queue", t: "this", n: "network", d: "docs"}[e.key];
+    gPending = 0;
+    if (page) go(page);
+  }
+});
+
+/* -------------------------------------------------------------- startup */
+(async function start() {
+  if (!TOKEN) {
+    document.body.innerHTML = '<div class="empty" style="margin-top:20vh"><b>This page needs the link that locnet console printed</b>Run <span class="inline-code">locnet console</span> and open the address it shows.</div>';
+    return;
+  }
+  try { S.info = await api("/api/info"); $("ver").textContent = S.info.version ? "v" + S.info.version : ""; } catch (e) {}
+  try { S.accounts = await api("/api/accounts"); } catch (e) {}
+  await refresh();
+  go(hashPage());
+  queueRefresh();
+  schedule();
+})();
+</script>
+</body>
+</html>

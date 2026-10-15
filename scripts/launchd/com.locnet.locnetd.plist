@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.locnet.locnetd</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/locnetd</string>
+    </array>
+
+    <!-- A system daemon, not a user agent: the tunnel must exist before
+         anyone logs in and survive after they log out. -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- launchd's default throttle is 10s between restarts, which is fine:
+         the usual reason locnetd exits is a hub that is briefly unreachable. -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>/var/log/locnet/locnetd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/locnet/locnetd.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

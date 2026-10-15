@@ -1,0 +1,78 @@
+{
+  "name": "locnet-compute",
+  "displayName": "LocNet Compute",
+  "description": "Run the file you are editing on a more powerful machine on your LocNet mesh, and see the output here.",
+  "version": "0.1.0",
+  "publisher": "locnet",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other", "Programming Languages"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "locnet.runHere", "title": "LocNet: Run This File on the Best Machine", "icon": "$(rocket)" },
+      { "command": "locnet.runOn", "title": "LocNet: Run This File On…" },
+      { "command": "locnet.runGPU", "title": "LocNet: Run This File on a GPU Machine" },
+      { "command": "locnet.pickMachine", "title": "LocNet: Choose Target Machine" },
+      { "command": "locnet.showMachines", "title": "LocNet: Show Machines and Free Capacity" },
+      { "command": "locnet.juliaSnippet", "title": "LocNet: Insert Julia addprocs() for This Mesh" },
+      { "command": "locnet.cancel", "title": "LocNet: Stop the Running Job" }
+    ],
+    "menus": {
+      "editor/title/run": [
+        { "command": "locnet.runHere", "group": "navigation", "when": "resourceScheme == file" }
+      ]
+    },
+    "keybindings": [
+      { "command": "locnet.runHere", "key": "ctrl+alt+r", "mac": "cmd+alt+r", "when": "editorTextFocus" }
+    ],
+    "configuration": {
+      "title": "LocNet Compute",
+      "properties": {
+        "locnet.path": {
+          "type": "string", "default": "locnet",
+          "description": "Path to the locnet binary."
+        },
+        "locnet.machine": {
+          "type": "string", "default": "",
+          "description": "Machine to run on. Empty means whichever has the most free capacity."
+        },
+        "locnet.syncBack": {
+          "type": "boolean", "default": true,
+          "description": "Copy the folder back after a run, so files the job wrote appear locally."
+        },
+        "locnet.exclude": {
+          "type": "string", "default": ".git,node_modules,target,build,__pycache__,.venv",
+          "description": "Comma-separated patterns not to send."
+        },
+        "locnet.juliaThreads": {
+          "type": "string", "default": "auto",
+          "description": "Value for julia -t. \"auto\" uses every core on the far machine."
+        },
+        "locnet.commands": {
+          "type": "object",
+          "default": {
+            "julia": "julia -t ${threads} ${file}",
+            "python": "python3 ${file}",
+            "r": "Rscript ${file}",
+            "shellscript": "bash ${file}",
+            "javascript": "node ${file}",
+            "typescript": "npx tsx ${file}"
+          },
+          "description": "How to run each language on the far machine. ${file} is the path relative to the workspace root; ${threads} is locnet.juliaThreads."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.3"
+  }
+}

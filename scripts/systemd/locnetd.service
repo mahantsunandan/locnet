@@ -1,0 +1,50 @@
+[Unit]
+Description=LocNet node agent
+Documentation=https://github.com/mahantsunandan/locnet
+# The agent needs a route off the machine before it can reach the hub, and it
+# needs DNS if the hub is named rather than numbered.
+After=network-online.target nss-lookup.target
+Wants=network-online.target
+
+# Never give up restarting. The usual cause of repeated failure is a network
+# or a hub that is temporarily away, and a service that stopped trying after
+# five attempts is a service you discover is dead days later.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/locnetd
+Restart=always
+RestartSec=5
+
+# /run/locnet holds the control socket the CLI connects to. 0750 means the
+# socket is reachable by root and by members of the locnet group, if you make
+# one — see docs/SECURITY.md.
+RuntimeDirectory=locnet
+RuntimeDirectoryMode=0750
+StateDirectory=locnet
+StateDirectoryMode=0700
+
+# locnetd creates a network interface and rewrites the routing table, so it
+# cannot be meaningfully sandboxed away from the network. Everything else is
+# still worth locking down.
+NoNewPrivileges=yes
+# Home directories stay visible. ProtectHome=yes used to be here, and it hid
+# /home from the agent and from everything the agent starts: a folder share of
+# ~/Projects failed with "no such file", and a compute job running as a real
+# user could not open a single one of that user's files ("Permission denied"
+# on /home). Both features exist to reach exactly those files.
+ProtectHome=no
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+# ProtectSystem=strict is deliberately not set: `locnet hosts on` writes to
+# /etc/hosts, and a read-only /etc would make that fail confusingly.
+ProtectSystem=full
+ReadWritePaths=/etc/hosts
+
+[Install]
+WantedBy=multi-user.target
